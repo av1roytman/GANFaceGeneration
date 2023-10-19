@@ -15,3 +15,18 @@ data = torch.tensor(digits.images / 8 - 1).float().unsqueeze(1)  # Scale and add
 targets = torch.tensor(digits.target)
 dataset = TensorDataset(data, targets)
 dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+# Define Generator Class
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d(100, 128, 4),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(128, 1, 3, stride=2),  # Adjusted size for 8x8 images
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        return self.main(input)
