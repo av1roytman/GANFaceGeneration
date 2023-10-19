@@ -30,3 +30,23 @@ class Generator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
+
+# Define the Discriminator
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(1, 128, 3, stride=2),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(128, 64, 4, stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.AdaptiveAvgPool2d((1,1)),
+            nn.Flatten(),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, input):
+        return self.main(input)
