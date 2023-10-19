@@ -91,3 +91,18 @@ for epoch in range(num_epochs):
 
         if i % 100 == 0:
             print(f'[{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD.item()} Loss_G: {errG.item()}')
+            
+fixed_noise = torch.randn(64, 100, 1, 1, device=device)
+
+# After training, use the generator to produce images from the fixed noise vectors
+with torch.no_grad():
+    fake_images = netG(fixed_noise).cpu().numpy()
+
+# Plot some of the generated images
+plt.figure(figsize=(8,8))
+for i in range(64):
+    plt.subplot(8, 8, i+1)
+    plt.imshow(fake_images[i][0], cmap='gray')
+    plt.axis('off')
+
+plt.show()
