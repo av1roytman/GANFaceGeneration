@@ -50,3 +50,44 @@ class Discriminator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
+    
+# Model Initialization
+netG = Generator().to(device)
+netD = Discriminator().to(device)
+
+# Loss and Optimizer
+criterion = nn.BCELoss()
+optimizerD = torch.optim.Adam(netD.parameters(), lr=0.0002)
+optimizerG = torch.optim.Adam(netG.parameters(), lr=0.0002)
+
+# Training Loop
+num_epochs = 100
+for epoch in range(num_epochs):
+    for i, (data, targets) in enumerate(dataloader, 0):
+        netD.zero_grad()
+        real_data = data
+        batch_size = real_data.size(0)
+        label = torch.full((batch_size,), 1, dtype=torch.float, device=device)
+
+        output = netD(real_data).view(-1)
+        errD_real = criterion(output, label)
+        errD_real.backward()
+        noise = torch.randn(batch_size, 100, 1, 1, device=device)
+
+        fake = netG(noise)
+        label.fill_(0)
+        output = netD(fake.detach()).view(-1)
+        errD_fake = criterion(output, label)
+        errD_fake.backward()
+        errD = errD_real + errD_fake
+        optimizerD.step()
+
+        netG.zero_grad()
+        label.fill_(1)
+        output = netD(fake).view(-1)
+        errG = criterion(output, label)
+        errG.backward()
+        optimizerG.step()
+
+        if i % 100 == 0:
+            print(f'[{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD.item()} Loss_G: {errG.item()}')
