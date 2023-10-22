@@ -38,12 +38,12 @@ class Generator(nn.Module):
         self.main = nn.Sequential(
             # Input size: (batch_size, 100, 1, 1)
             # ConvTranspose2d will increase the spatial dimensions from 1x1 to 4x4
-            nn.ConvTranspose2d(100, 4, 4, stride=1),  # Output size: (batch_size, 4, 4, 4)
-            nn.BatchNorm2d(4),  # Batch normalization does not change the size: (batch_size, 4, 4, 4)
-            nn.ReLU(True),  # ReLU activation does not change the size: (batch_size, 4, 4, 4)
+            nn.ConvTranspose2d(100, 16, 4, stride=1),  # Output size: (batch_size, 16, 4, 4)
+            nn.BatchNorm2d(16),  # Batch normalization does not change the size: (batch_size, 16, 4, 4)
+            nn.ReLU(True),  # ReLU activation does not change the size: (batch_size, 16, 4, 4)
             
             # ConvTranspose2d will increase the spatial dimensions from 4x4 to 8x8
-            nn.ConvTranspose2d(4, 1, 4, stride=2, padding=1),  # Output size: (batch_size, 1, 8, 8)
+            nn.ConvTranspose2d(16, 1, 4, stride=2, padding=1),  # Output size: (batch_size, 1, 8, 8)
             nn.Tanh()  # Tanh activation does not change the size: (batch_size, 1, 8, 8)
         )
 
@@ -61,12 +61,12 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             # Conv2d will reduce the spatial dimensions from 4x4 to 2x2
-            # Adjusted the number of output filters and kernel size to maintain proportions
-            nn.Conv2d(4, 4, 3, stride=2, padding=1),  # Output size: (batch_size, 4, 2, 2)
+            # Adjusted the number of output filters to 16
+            nn.Conv2d(4, 16, 3, stride=2, padding=1),  # Output size: (batch_size, 16, 2, 2)
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Flatten(),  # Output size: (batch_size, 16)
-            nn.Linear(16, 1),  # Output size: (batch_size, 1)
+            nn.Flatten(),  # Output size: (batch_size, 64)
+            nn.Linear(64, 1),  # Output size: (batch_size, 1)
             nn.Sigmoid() # Size doesn't change. Only normalizes to [0, 1]
         )
 
