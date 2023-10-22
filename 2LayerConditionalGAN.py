@@ -36,11 +36,15 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
-            nn.ConvTranspose2d(100, 128, 4, stride=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(128, 1, 4, stride=2, padding=1),  # Adjusted size for 8x8 images
-            nn.Tanh()
+            # Input size: (batch_size, 100, 1, 1)
+            # ConvTranspose2d will increase the spatial dimensions from 1x1 to 4x4
+            nn.ConvTranspose2d(100, 128, 4, stride=1),  # Output size: (batch_size, 128, 4, 4)
+            nn.BatchNorm2d(128),  # Batch normalization does not change the size: (batch_size, 128, 4, 4)
+            nn.ReLU(True),  # ReLU activation does not change the size: (batch_size, 128, 4, 4)
+            
+            # ConvTranspose2d will increase the spatial dimensions from 4x4 to 8x8
+            nn.ConvTranspose2d(128, 1, 4, stride=2, padding=1),  # Output size: (batch_size, 1, 8, 8)
+            nn.Tanh()  # Tanh activation does not change the size: (batch_size, 1, 8, 8)
         )
 
     def forward(self, input):
@@ -51,15 +55,19 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
-            nn.Conv2d(1, 128, 3, stride=2, padding=1),
+            # Input size: (batch_size, 1, 8, 8)
+            # Conv2d will reduce the spatial dimensions from 8x8 to 4x4
+            # nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+            nn.Conv2d(1, 128, 3, stride=2, padding=1),  # Output size: (batch_size, 128, 4, 4)
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(128, 64, 4, stride=2),
+            # Conv2d will reduce the spatial dimensions from 4x4 to 1x1
+            nn.Conv2d(128, 64, 4, stride=2),  # Output size: (batch_size, 64, 1, 1)
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Flatten(),
-            nn.Linear(64, 1),
-            nn.Sigmoid()
+            nn.Flatten(),  # Output size: (batch_size, 64)
+            nn.Linear(64, 1),  # Output size: (batch_size, 1)
+            nn.Sigmoid() # Size doesn't change. Only normalizes to [0, 1]
         )
 
     def forward(self, input):
