@@ -40,10 +40,15 @@ transform = transforms.Compose([
 image_dir = 'img_align_celeba'
 
 # Create a dataset
-dataset = CelebADataset(image_dir=image_dir, transform=transform, num_samples=100000)
+dataset = CelebADataset(image_dir=image_dir, transform=transform)
+
+# Batch Size Hyperparameter
+global_batch_size = 64
 
 # Create a data loader
-dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+# num_gpus = torch.cuda.device_count()
+# print("Number of available GPUs:", num_gpus)
+dataloader = DataLoader(dataset, batch_size=global_batch_size, shuffle=True, pin_memory=True, num_workers=8)
 
 # Create a 3x3 grid for the images
 fig, axes = plt.subplots(3, 3, figsize=(9, 9))
@@ -139,7 +144,7 @@ optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
 # Training Loop
-for epoch in range(num_epochs):
+for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
         # Transfer data tensor to GPU/CPU (device)
         real_data = data.to(device) * 2 - 1  # Scale images to [-1, 1]
@@ -169,13 +174,13 @@ for epoch in range(num_epochs):
         errG.backward()
         optimizerG.step()
 
-        if i % 10 == 0:
+        if i % 50 == 0:
             print(f'[{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
 print("Training is complete!")
 
 
-fixed_noise = torch.randn(32, 100, 1, 1, device=device)
+fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
 
 # After training, use the generator to produce images from the fixed noise vectors
 with torch.no_grad():

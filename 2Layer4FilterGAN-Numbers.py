@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 digits = datasets.load_digits()
 
 # Reshape data and scale to [-1, 1]
-number_to_generate = 6
+number_to_generate = 4
 data = torch.tensor(digits.images[digits.target == number_to_generate] / 8 - 1).float().unsqueeze(1)  # Scale and add channel dimension
 targets = torch.tensor(digits.target[digits.target == number_to_generate])
 dataset = TensorDataset(data, targets)
