@@ -37,17 +37,13 @@ transform = transforms.Compose([
     transforms.ToTensor(),
 ])
 
-image_dir = 'img_align_celeba/img_align_celeba'
+image_dir = 'img_align_celeba'
 
 # Create a dataset
-dataset = CelebADataset(image_dir=image_dir, transform=transform, num_samples=1000)
+dataset = CelebADataset(image_dir=image_dir, transform=transform, num_samples=100000)
 
 # Create a data loader
 dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-
-def imshow(img):
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
 
 # Create a 3x3 grid for the images
 fig, axes = plt.subplots(3, 3, figsize=(9, 9))
@@ -60,29 +56,14 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-plt.show()
+base = 'produced_images'
+plt.savefig(os.path.join(base, 'celeba_sample.png'))
+plt.close(fig)
 
 # Define Generator Class
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
-        # self.main = nn.Sequential(
-        #     # Input is Z, going into a convolution
-        #     nn.ConvTranspose2d(100, 256, 4, 1, 0, bias=False),  # 256 x 4 x 4
-        #     nn.BatchNorm2d(256),
-        #     nn.ReLU(True),
-            
-        #     nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),  # 128 x 8 x 8
-        #     nn.BatchNorm2d(128),
-        #     nn.ReLU(True),
-            
-        #     nn.ConvTranspose2d(128, 64, 4, 4, 1, bias=False),  # 64 x 32 x 32
-        #     nn.BatchNorm2d(64),
-        #     nn.ReLU(True),
-            
-        #     nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False),  # 3 x 64 x 64
-        #     nn.Tanh()
-        # )
         self.main = nn.Sequential(
             # input is Z, going into a convolution
             nn.ConvTranspose2d(100, 512, 4, 1, 0, bias=False),
@@ -114,46 +95,32 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
-        # self.main = nn.Sequential(
-        #     # Input: 3 x 64 x 64
-        #     nn.Conv2d(3, 64, 4, stride=2, padding=1),  # 64 x 32 x 32
-        #     nn.LeakyReLU(0.2, inplace=True),
-            
-        #     nn.Conv2d(64, 128, 4, stride=2, padding=1), # 128 x 16 x 16
-        #     nn.BatchNorm2d(128),
-        #     nn.LeakyReLU(0.2, inplace=True),
-            
-        #     nn.Conv2d(128, 256, 4, stride=2, padding=1), # 256 x 8 x 8
-        #     nn.BatchNorm2d(256),
-        #     nn.LeakyReLU(0.2, inplace=True),
-            
-        #     nn.Conv2d(256, 1, 8, stride=1, padding=0), # 1 x 1 x 1
-        #     nn.Sigmoid()
-        # )
         self.main = nn.Sequential(
             # Input: 3 x 64 x 64
-            nn.Conv2d(3, 128, 3, stride=2, padding=1),
+            nn.Conv2d(3, 64, 3, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
-            # state size. 128 x 32 x 32
+            # state size. 64 x 32 x 32
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. 128 x 16 x 16
             nn.Conv2d(128, 256, 3, stride=2, padding=1),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
-            # state size. 256 x 16 x 16
+            # state size. 256 x 8 x 8
             nn.Conv2d(256, 512, 3, stride=2, padding=1),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True),
-            # state size. 512 x 8 x 8
-            nn.Conv2d(512, 1024, 3, stride=2, padding=1),
-            nn.BatchNorm2d(1024),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. 1024 x 4 x 4
-            nn.Flatten(),
-            nn.Linear(1024*4*4, 1),
+            # state size. 512 x 4 x 4
+
+            nn.Conv2d(512, 1, kernel_size=4, stride=1, padding=0),
+            # state size. 1 x 1 x 1
             nn.Sigmoid()
+            # state size. 1
         )
 
     def forward(self, input):
-        return self.main(input)
+        return self.main(input).view(-1, 1).squeeze(1) # Remove the extra dimension
 
     
 # Model Initialization
@@ -225,4 +192,5 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-plt.show()
+plt.savefig(os.path.join(base, 'celeba_fake.png'))
+plt.close(fig)
