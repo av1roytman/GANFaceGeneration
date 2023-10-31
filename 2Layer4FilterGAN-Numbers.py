@@ -21,15 +21,16 @@ dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
 # Print some of the images
 num_images_to_print = 16
-def plot_images(images):
+def plot_images(images, name):
     plt.figure(figsize=(8, 8))
     for i in range(num_images_to_print):
         plt.subplot(round(math.sqrt(num_images_to_print)), round(math.sqrt(num_images_to_print)), i+1)
         plt.imshow(images[i][0], cmap='gray')
         plt.axis('off')
-    plt.show()
+    plt.savefig('produced_images/' + name)
+    plt.close()
 
-plot_images(data)
+plot_images(data, 'digits_real.png')
 
 # Define Generator Class
 class Generator(nn.Module):
@@ -65,13 +66,13 @@ class Discriminator(nn.Module):
             nn.Conv2d(4, 16, 3, stride=2, padding=1),  # Output size: (batch_size, 16, 2, 2)
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Flatten(),  # Output size: (batch_size, 64)
-            nn.Linear(64, 1),  # Output size: (batch_size, 1)
+            nn.Conv2d(16, 1, 2, stride=1, padding=0),  # Output size: (batch_size, 1, 1, 1)
+
             nn.Sigmoid() # Size doesn't change. Only normalizes to [0, 1]
         )
 
     def forward(self, input):
-        return self.main(input)
+        return self.main(input).view(-1, 1).squeeze(1) # Remove the extra dimension
     
 # Model Initialization
 netG = Generator().to(device)
@@ -83,22 +84,22 @@ optimizerD = torch.optim.Adam(netD.parameters(), lr=0.0002)
 optimizerG = torch.optim.Adam(netG.parameters(), lr=0.0002)
 
 # Training Loop
-num_epochs = 10000
+num_epochs = 1000
 for epoch in range(num_epochs):
     for i, (data, targets) in enumerate(dataloader, 0):
         netD.zero_grad()
-        real_data = data
+        real_data = data.to(device)
         batch_size = real_data.size(0)
         label = torch.full((batch_size,), 1, dtype=torch.float, device=device)
 
-        output = netD(real_data).view(-1)
+        output = netD(real_data)
         errD_real = criterion(output, label)
         errD_real.backward()
         noise = torch.randn(batch_size, 100, 1, 1, device=device)
 
         fake = netG(noise)
         label.fill_(0)
-        output = netD(fake.detach()).view(-1)
+        output = netD(fake.detach())
         errD_fake = criterion(output, label)
         errD_fake.backward()
         errD = errD_real + errD_fake
@@ -106,7 +107,7 @@ for epoch in range(num_epochs):
 
         netG.zero_grad()
         label.fill_(1)
-        output = netD(fake).view(-1)
+        output = netD(fake)
         errG = criterion(output, label)
         errG.backward()
         optimizerG.step()
@@ -121,4 +122,4 @@ with torch.no_grad():
     fake_images = netG(fixed_noise).cpu().numpy()
 
 # Plot fake images
-plot_images(fake_images)
+plot_images(fake_images, 'digits_fake.png')
