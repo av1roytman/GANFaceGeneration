@@ -103,6 +103,7 @@ class Discriminator(nn.Module):
         self.main = nn.Sequential(
             # Input: 3 x 64 x 64
             nn.Conv2d(3, 64, 3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. 64 x 32 x 32
             nn.Conv2d(64, 128, 3, stride=2, padding=1),
@@ -133,8 +134,8 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 5
-lr = 0.0002
+num_epochs = 20
+lr = 0.002
 beta1 = 0.5
 
 # Binary cross entropy loss and optimizer

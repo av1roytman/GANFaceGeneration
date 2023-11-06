@@ -142,7 +142,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 5
+num_epochs = 15
 lr = 0.0002
 beta1 = 0.5
 
