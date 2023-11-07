@@ -10,3 +10,9 @@ Files:
     - Plan:
         -  Change the standard GAN into a conditional GAN. 
         -  Find a facial image dataset (celebA, olivetti, etc.)
+
+5LayerGANForFaces.py
+    - Incorporated the CelebA dataset to implement the 5 Layer GAN for generating faces.
+    - 11/07/2023: contains the holistic GAN implementation
+    - Plan: 
+        - 
