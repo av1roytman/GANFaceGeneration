@@ -8,6 +8,8 @@ import numpy as np
 import math
 from PIL import Image
 import os
+from torch.cuda.amp import GradScaler
+from torch.nn import BCEWithLogitsLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -103,7 +105,6 @@ class Discriminator(nn.Module):
         self.main = nn.Sequential(
             # Input: 3 x 64 x 64
             nn.Conv2d(3, 64, 3, stride=2, padding=1),
-            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. 64 x 32 x 32
             nn.Conv2d(64, 128, 3, stride=2, padding=1),
@@ -121,7 +122,7 @@ class Discriminator(nn.Module):
 
             nn.Conv2d(512, 1, kernel_size=4, stride=1, padding=0),
             # state size. 1 x 1 x 1
-            nn.Sigmoid()
+            # nn.Sigmoid() #Commented because of LogitLoss
             # state size. 1
         )
 
@@ -134,23 +135,21 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 20
-lr = 0.002
+num_epochs = 5
+lr = 0.0002
 beta1 = 0.5
 
 # Binary cross entropy loss and optimizer
-criterion = nn.BCELoss()
+scaler = GradScaler()
+criterion = BCEWithLogitsLoss()
 
 optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
-gen_loss = []
-dis_loss = []
-batch_count = []
+# Training Loop
 
 dataloader_length = len(dataloader)
 
-# Training Loop
 for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
         # Transfer data tensor to GPU/CPU (device)
@@ -160,31 +159,40 @@ for epoch in range(1, num_epochs + 1):
 
         # Train Discriminator
         netD.zero_grad()
-        output = netD(real_data).view(-1)
-        errD_real = criterion(output, label)
-        errD_real.backward()
+        # Wrap the forward pass in an autocast context
+        with torch.cuda.amp.autocast():
+            output = netD(real_data).view(-1)
+            # Pass the pre-sigmoid output to criterion
+            errD_real = criterion(output, label)
+        # Scale the loss and call backward
+        scaler.scale(errD_real).backward()
         
         noise = torch.randn(batch_size, 100, 1, 1, device=device)
         fake = netG(noise)
-        label.fill_(0) # The discriminator wants to classify the fake images as fake
-        output = netD(fake.detach()).view(-1)
-        errD_fake = criterion(output, label)
-        errD_fake.backward()
+        label.fill_(0)
+        with torch.cuda.amp.autocast():
+            output = netD(fake.detach()).view(-1)
+            # Pass the pre-sigmoid output to criterion
+            errD_fake = criterion(output, label)
+        # Scale the loss and call backward
+        scaler.scale(errD_fake).backward()
         errD = errD_real + errD_fake
-        optimizerD.step()
+        # Step the optimizer and unscale the gradients
+        scaler.step(optimizerD)
+        scaler.update()
 
         # Train Generator
         netG.zero_grad()
         label.fill_(1)  # The generator wants the discriminator to think the fake images are real
-        output = netD(fake).view(-1)
-        errG = criterion(output, label)
-        errG.backward()
-        optimizerG.step()
-
-        # Save Losses for plotting later
-        gen_loss.append(errG.item())
-        dis_loss.append(errD.item())
-        batch_count.append(i + dataloader_length * epoch)
+        with torch.cuda.amp.autocast():
+            output = netD(fake).view(-1)
+            # Pass the pre-sigmoid output to criterion
+            errG = criterion(output, label)
+        # Scale the loss and call backward
+        scaler.scale(errG).backward()
+        # Step the optimizer and unscale the gradients
+        scaler.step(optimizerG)
+        scaler.update()
 
         if i % 50 == 0:
             print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
@@ -211,14 +219,3 @@ for i in range(9):
 
 plt.savefig(os.path.join(base, 'celeba_fake.png'))
 plt.close(fig)
-
-# Graph the Loss
-plt.figure(figsize=(10, 5))
-plt.title("Generator and Discriminator Loss During Training")
-plt.plot(batch_count, gen_loss, label="Generator")
-plt.plot(batch_count, dis_loss, label="Discriminator")
-plt.xlabel("Batch Count")
-plt.ylabel("Loss")
-plt.legend()
-plt.savefig(os.path.join(base, 'celeba_loss.png'))
-plt.close()
