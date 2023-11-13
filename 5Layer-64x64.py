@@ -61,7 +61,7 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-base = 'produced_images'
+base = 'produced_images/5-layer'
 plt.savefig(os.path.join(base, 'celeba_sample.png'))
 plt.close(fig)
 
