@@ -71,7 +71,11 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d(100, 512, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d(100, 1024, 2, 1, 0, bias=False),
+            nn.BatchNorm2d(1024),
+            nn.ReLU(True),
+            # state size. 1024 x 2 x 2
+            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(True),
             # state size. 512 x 4 x 4
@@ -119,7 +123,12 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             # state size. 512 x 4 x 4
 
-            nn.Conv2d(512, 1, kernel_size=4, stride=1, padding=0),
+            nn.Conv2d(512, 1024, 3, stride=2, padding=1),
+            nn.BatchNorm2d(1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            #state size. 1024 x 2 x 2
+
+            nn.Conv2d(1024, 1, kernel_size=2, stride=1, padding=0),
             # state size. 1 x 1 x 1
             nn.Sigmoid()
             # state size. 1
@@ -209,7 +218,7 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-plt.savefig(os.path.join(base, 'celeba_fake_lr_0002.png'))
+plt.savefig(os.path.join(base, 'celeba_fake_6layer-64x64.png'))
 plt.close(fig)
 
 # Graph the Loss

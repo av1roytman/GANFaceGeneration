@@ -142,7 +142,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 15
+num_epochs = 50
 lr = 0.0002
 beta1 = 0.5
 
@@ -151,6 +151,12 @@ criterion = nn.BCELoss()
 
 optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
+
+dataloader_length = len(dataloader)
+
+gen_loss = []
+dis_loss = []
+batch_count = []
 
 # Training Loop
 for epoch in range(1, num_epochs + 1):
@@ -183,8 +189,13 @@ for epoch in range(1, num_epochs + 1):
         errG.backward()
         optimizerG.step()
 
+        # Save Losses for plotting later
+        gen_loss.append(errG.item())
+        dis_loss.append(errD.item())
+        batch_count.append(i + dataloader_length * epoch)
+
         if i % 50 == 0:
-            print(f'[{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
+            print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
 print("Training is complete!")
 
@@ -208,3 +219,14 @@ for i in range(9):
 
 plt.savefig(os.path.join(base, 'celeba_fake_128.png'))
 plt.close(fig)
+
+# Graph the Loss
+plt.figure(figsize=(10, 5))
+plt.title("Generator and Discriminator Loss During Training")
+plt.plot(batch_count, gen_loss, label="Generator")
+plt.plot(batch_count, dis_loss, label="Discriminator")
+plt.xlabel("Batch Count")
+plt.ylabel("Loss")
+plt.legend()
+plt.savefig(os.path.join(base, 'celeba_loss-6layer-Full_Size.png'))
+plt.close()
