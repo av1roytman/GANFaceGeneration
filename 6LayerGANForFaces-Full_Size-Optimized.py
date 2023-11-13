@@ -148,7 +148,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 25
+num_epochs = 20
 lr = 0.0002
 beta1 = 0.5
 
@@ -172,18 +172,21 @@ for epoch in range(1, num_epochs + 1):
         # Transfer data tensor to GPU/CPU (device)
         real_data = data.to(device)
         batch_size = real_data.size(0)
+        # Create the labels which are later used as input for the BCE loss
         label = torch.full((batch_size,), 1, dtype=torch.float, device=device)
 
         # Train Discriminator
+        # Train with all-real batch
         netD.zero_grad(set_to_none=True)
         with torch.cuda.amp.autocast():
             output = netD(real_data).view(-1)
             errD_real = criterion(output, label)
         scaler.scale(errD_real).backward()
         
+        # Train with all-fake batch
         noise = torch.randn(batch_size, 100, 1, 1, device=device)
         fake = netG(noise)
-        label.fill_(0)
+        label.fill_(0) # The discriminator wants the fake images to be labeled as fake
         with torch.cuda.amp.autocast():
             output = netD(fake.detach()).view(-1)
             errD_fake = criterion(output, label)
