@@ -36,7 +36,10 @@ class CelebADataset(Dataset):
 # Reshape data and scale to [-1, 1]
 transform = transforms.Compose([
     transforms.Resize((128, 128)),
+    transforms.RandomHorizontalFlip(),  # Data augmentation
+    transforms.ColorJitter(),           # Data augmentation
     transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,)),  # Normalize to [-1, 1]
 ])
 
 image_dir = 'img_align_celeba'
@@ -60,6 +63,7 @@ axes = axes.flatten()
 
 for i in range(9):
     image = dataset[i]
+    image = (image + 1) / 2.0 # Scale images to [0, 1] to visualize better
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
@@ -144,7 +148,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 20
+num_epochs = 25
 lr = 0.0002
 beta1 = 0.5
 
@@ -157,11 +161,16 @@ optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
 dataloader_length = len(dataloader)
 
+# Lists to keep track of progress
+G_losses = []
+D_losses = []
+iters = 0
+
 # Training Loop
 for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
         # Transfer data tensor to GPU/CPU (device)
-        real_data = data.to(device) * 2 - 1  # Scale images to [-1, 1]
+        real_data = data.to(device)
         batch_size = real_data.size(0)
         label = torch.full((batch_size,), 1, dtype=torch.float, device=device)
 
@@ -193,15 +202,36 @@ for epoch in range(1, num_epochs + 1):
         scaler.step(optimizerG)
         scaler.update()
 
+        # Save Losses for plotting later
+        G_losses.append(errG.item())
+        D_losses.append(errD.item())
+        iters += 1
+
         if i % 50 == 0:
             print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
 print("Training is complete!")
 
+# Save the trained model
+model_base = 'model_states'
+torch.save(netG.state_dict(), os.path.join(model_base, 'generator_128_6layer.pth'))
 
+# Plot the training losses
+plt.figure(figsize=(10, 5))
+plt.title("Generator and Discriminator Loss During Training")
+plt.plot(G_losses, label="G")
+plt.plot(D_losses, label="D")
+plt.xlabel("Iterations")
+plt.ylabel("Loss")
+plt.legend()
+plt.savefig(os.path.join(base, 'celeba_loss_128_6layer.png'))
+plt.close()
+
+# Create Fixed Noise
 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
 
 # After training, use the generator to produce images from the fixed noise vectors
+netG.eval()
 with torch.no_grad():
     fake_images = netG(fixed_noise).detach().cpu()
 
