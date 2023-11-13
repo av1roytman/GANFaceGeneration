@@ -148,7 +148,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 20
+num_epochs = 15
 lr = 0.0002
 beta1 = 0.5
 
@@ -216,8 +216,8 @@ for epoch in range(1, num_epochs + 1):
 print("Training is complete!")
 
 # Save the trained model
-model_base = 'model_states'
-torch.save(netG.state_dict(), os.path.join(model_base, 'generator_128_6layer.pth'))
+model_base = 'model_states/6-layer'
+torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-Optimized.pth'))
 
 # Plot the training losses
 plt.figure(figsize=(10, 5))
@@ -227,7 +227,7 @@ plt.plot(D_losses, label="D")
 plt.xlabel("Iterations")
 plt.ylabel("Loss")
 plt.legend()
-plt.savefig(os.path.join(base, 'celeba_loss_128_6layer.png'))
+plt.savefig(os.path.join(base, 'Loss_6Layer-128x128-Optimized.png'))
 plt.close()
 
 # Create Fixed Noise
@@ -249,5 +249,5 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-plt.savefig(os.path.join(base, 'celeba_fake_128_6layer.png'))
+plt.savefig(os.path.join(base, '6Layer-128x128-Optimized.png'))
 plt.close(fig)
