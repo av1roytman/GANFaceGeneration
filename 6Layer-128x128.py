@@ -35,6 +35,7 @@ class CelebADataset(Dataset):
 transform = transforms.Compose([
     transforms.Resize((128, 128)),
     transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalizing to [-1, 1]
 ])
 
 image_dir = 'img_align_celeba'
@@ -58,6 +59,7 @@ axes = axes.flatten()
 
 for i in range(9):
     image = dataset[i]
+    image = (image + 1) / 2.0 # Scale images to [0, 1] to visualize better
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
@@ -142,8 +144,8 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 15
-lr = 0.0002
+num_epochs = 50
+lr = 0.00002
 beta1 = 0.5
 
 # Binary cross entropy loss and optimizer
@@ -162,7 +164,7 @@ batch_count = []
 for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
         # Transfer data tensor to GPU/CPU (device)
-        real_data = data.to(device) * 2 - 1  # Scale images to [-1, 1]
+        real_data = data.to(device)
         batch_size = real_data.size(0)
         label = torch.full((batch_size,), 1, dtype=torch.float, device=device)
 
