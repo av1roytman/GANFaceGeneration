@@ -144,8 +144,8 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 50
-lr = 0.00002
+num_epochs = 100
+lr = 0.00001
 beta1 = 0.5
 
 # Binary cross entropy loss and optimizer
