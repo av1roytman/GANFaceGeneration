@@ -72,10 +72,10 @@ plt.close(fig)
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
-        self.fc = nn.Linear(100, 1024*4*4)
+        # self.fc = nn.Linear(100, 1024*4*4)
         self.main = nn.Sequential(
             # Replaced ConvTranspose2d with Dense Layer, hopefully will help
-            # nn.ConvTranspose2d(100, 1024, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d(100, 1024, 4, 1, 0, bias=False),
             nn.BatchNorm2d(1024),
             nn.ReLU(True),
             # state size. 1024 x 4 x 4
@@ -102,8 +102,9 @@ class Generator(nn.Module):
         )
 
     def forward(self, input):
-        output = self.fc(input).view(-1, 1024, 4, 4) # Reshape to 1024 x 4 x 4
-        return self.main(output)
+        # input = input.view(input.size(0), -1) # Reshape to 100
+        # output = self.fc(input).view(-1, 1024, 4, 4) # Reshape to 1024 x 4 x 4
+        return self.main(input)
 
 
 # Define the Discriminator
@@ -119,25 +120,25 @@ class Discriminator(nn.Module):
             nn.Conv2d(64, 128, 3, stride=2, padding=1),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(0.2), # Dropout Layer
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 128 x 32 x 32
 
             nn.Conv2d(128, 256, 3, stride=2, padding=1),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(0.2), # Dropout Layer
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 256 x 16 x 16
 
             nn.Conv2d(256, 512, 3, stride=2, padding=1),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(0.2), # Dropout Layer
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 512 x 8 x 8
 
             nn.Conv2d(512, 1024, 3, stride=2, padding=1),
             nn.BatchNorm2d(1024),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(0.2), # Dropout Layer
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 1024 x 4 x 4
         )
         self.classifier = nn.Sequential(
@@ -160,7 +161,7 @@ class Reconstructor(nn.Module):
     def __init__(self):
         super(Reconstructor, self).__init__()
         self.main = nn.Sequential(
-            nn.Linear(16384, 1024), 
+            nn.Linear(1024*4*4, 1024), 
             nn.ReLU(True),
             nn.BatchNorm1d(1024),
             nn.Linear(1024, 512),
@@ -181,8 +182,8 @@ netD = Discriminator().to(device)
 netR = Reconstructor().to(device)
 
 # Hyperparameters
-num_epochs = 25
-lr = 0.0002
+num_epochs = 10
+lr = 0.00002
 beta1 = 0.5
 
 optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
@@ -229,7 +230,7 @@ for epoch in range(1, num_epochs + 1):
         optimizerG.zero_grad()
         fake_output = netD(fake).view(-1)
         loss_G = F.binary_cross_entropy_with_logits(fake_output, real_labels)
-        loss_G.backward(retain_graph=True)
+        loss_G.backward()
         optimizerG.step()
 
         # Train Reconstructor
