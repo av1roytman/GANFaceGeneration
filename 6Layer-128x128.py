@@ -112,21 +112,29 @@ class Discriminator(nn.Module):
             nn.Conv2d(3, 64, 3, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. 64 x 64 x 64
+
             nn.Conv2d(64, 128, 3, stride=2, padding=1),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 128 x 32 x 32
+
             nn.Conv2d(128, 256, 3, stride=2, padding=1),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 256 x 16 x 16
+
             nn.Conv2d(256, 512, 3, stride=2, padding=1),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 512 x 8 x 8
+
             nn.Conv2d(512, 1024, 3, stride=2, padding=1),
             nn.BatchNorm2d(1024),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 1024 x 4 x 4
 
             nn.Conv2d(1024, 1, kernel_size=4, stride=1, padding=0),
@@ -144,7 +152,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 100
+num_epochs = 25
 lr = 0.00001
 beta1 = 0.5
 

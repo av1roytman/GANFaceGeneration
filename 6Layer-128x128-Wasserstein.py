@@ -138,15 +138,37 @@ class Discriminator(nn.Module):
     def forward(self, input):
         return self.main(input).view(-1, 1).squeeze(1) # Remove the extra dimension
     
+def compute_gradient_penalty(discriminator, real_images, fake_images, device):
+    # Random weight term for interpolating between real and fake samples
+    alpha = torch.rand((real_images.size(0), 1, 1, 1), device=device)
+    alpha = alpha.expand_as(real_images)
+
+    # Get random interpolation between real and fake samples
+    interpolated = alpha * real_images + (1 - alpha) * fake_images
+    interpolated = interpolated.to(device)
+    interpolated.requires_grad_(True)
+
+    # Calculate discriminator output
+    prob_interpolated = discriminator(interpolated)
+
+    # Calculate gradients of probabilities with respect to examples
+    gradients = torch.autograd.grad(outputs=prob_interpolated, inputs=interpolated,
+                                    grad_outputs=torch.ones(prob_interpolated.size(), device=device),
+                                    create_graph=True, retain_graph=True)[0]
+
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    return gradient_penalty
+
 # Model Initialization
 netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 10
+num_epochs = 15
 lr = 0.00002
 beta1 = 0.5
-clip_value = 0.01  # Clip value for discriminator weights
+lambda_gp = 10  # Clip value for discriminator weights
 
 # Optimizers
 optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
@@ -168,18 +190,18 @@ for epoch in range(1, num_epochs + 1):
         for _ in range(5):  # Update the discriminator more frequently
             netD.zero_grad()
             real_loss = netD(real_data).mean()
-            real_loss.backward()
 
             noise = torch.randn(batch_size, 100, 1, 1, device=device)
             fake = netG(noise).detach()
             fake_loss = netD(fake).mean()
-            fake_loss.backward()
-            errD = real_loss - fake_loss
-            optimizerD.step()
 
-            # Clip weights of discriminator
-            for p in netD.parameters():
-                p.data.clamp_(-clip_value, clip_value)
+            errD = fake_loss - real_loss
+
+            gradient_penalty = compute_gradient_penalty(netD, real_data, fake, device)
+            errD += lambda_gp * gradient_penalty
+
+            errD.backward()
+            optimizerD.step()
 
         # Train Generator
         netG.zero_grad()
