@@ -110,7 +110,9 @@ class Discriminator(nn.Module):
         self.main = nn.Sequential(
             # Input: 3 x 128 x 128
             nn.Conv2d(3, 64, 3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 64 x 64 x 64
 
             nn.Conv2d(64, 128, 3, stride=2, padding=1),
@@ -147,12 +149,16 @@ class Discriminator(nn.Module):
         return self.main(input).view(-1, 1).squeeze(1) # Remove the extra dimension
 
     
+def add_noise_to_image(image, mean=0.0, std=0.1):
+    noise = torch.randn_like(image) * std + mean
+    return image + noise
+
 # Model Initialization
 netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 25
+num_epochs = 100
 lr = 0.00001
 beta1 = 0.5
 
@@ -173,6 +179,7 @@ for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
         # Transfer data tensor to GPU/CPU (device)
         real_data = data.to(device)
+        real_data = add_noise_to_image(real_data)
         batch_size = real_data.size(0)
         label = torch.full((batch_size,), 1, dtype=torch.float, device=device)
 
@@ -184,6 +191,7 @@ for epoch in range(1, num_epochs + 1):
         
         noise = torch.randn(batch_size, 100, 1, 1, device=device)
         fake = netG(noise)
+        fake = add_noise_to_image(fake)
         label.fill_(0)
         output = netD(fake.detach()).view(-1)
         errD_fake = criterion(output, label)
