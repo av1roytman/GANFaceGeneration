@@ -114,7 +114,9 @@ class Discriminator(nn.Module):
         self.features = nn.Sequential(
             # Input: 3 x 128 x 128
             nn.Conv2d(3, 64, 3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
             # state size. 64 x 64 x 64
 
             nn.Conv2d(64, 128, 3, stride=2, padding=1),
@@ -176,19 +178,26 @@ class Reconstructor(nn.Module):
     def forward(self, input):
         return self.main(input).view(-1, 100, 1, 1)
     
+def add_noise_to_image(image, mean=0.0, std=0.1):
+    noise = torch.randn_like(image) * std + mean
+    return image + noise
+
 # Model Initialization
 netG = Generator().to(device)
 netD = Discriminator().to(device)
 netR = Reconstructor().to(device)
 
 # Hyperparameters
-num_epochs = 10
+num_epochs = 5
 lr = 0.00002
 beta1 = 0.5
 
-optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
-optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
-optimizerR = torch.optim.Adam(netR.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerD = torch.optim.SGD(netD.parameters(), lr=lr)
+optimizerG = torch.optim.SGD(netG.parameters(), lr=lr)
+optimizerR = torch.optim.SGD(netR.parameters(), lr=lr)
+
+bce_loss = nn.BCEWithLogitsLoss()
+mse_loss = nn.MSELoss()
 
 dataloader_length = len(dataloader)
 
@@ -202,6 +211,8 @@ for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
         # Transfer data tensor to GPU/CPU (device)
         real_data = data.to(device)
+        real_data = add_noise_to_image(real_data)
+
         batch_size = real_data.size(0)
 
         # Create the labels which are later used as input for the BCE loss
@@ -213,15 +224,20 @@ for epoch in range(1, num_epochs + 1):
 
         # Generate fake image batch with G
         fake = netG(noise)
+        fake = add_noise_to_image(fake)
 
-        # Train Discriminator
+        # ---------------------
+        #  Train Discriminator
+        # ---------------------
         optimizerD.zero_grad()
 
         # Compute Discriminator Loss on Real and Fake Data
         real_output = netD(real_data).view(-1)
+        loss_D_real = bce_loss(real_output, real_labels)
+
         fake_output = netD(fake.detach()).view(-1)
-        loss_D_real = F.binary_cross_entropy_with_logits(real_output, real_labels)
-        loss_D_fake = F.binary_cross_entropy_with_logits(fake_output, fake_labels)
+        loss_D_fake = bce_loss(fake_output, fake_labels)
+
         loss_D = loss_D_real + loss_D_fake
         loss_D.backward()
         optimizerD.step()
@@ -229,7 +245,7 @@ for epoch in range(1, num_epochs + 1):
         # Train Generator
         optimizerG.zero_grad()
         fake_output = netD(fake).view(-1)
-        loss_G = F.binary_cross_entropy_with_logits(fake_output, real_labels)
+        loss_G = bce_loss(fake_output, real_labels)
         loss_G.backward()
         optimizerG.step()
 
@@ -237,7 +253,7 @@ for epoch in range(1, num_epochs + 1):
         optimizerR.zero_grad()
         feature_map_fake = netD(fake.detach(), feature=True)
         reconstructed_noise = netR(feature_map_fake)
-        loss_R = F.mse_loss(reconstructed_noise, noise)
+        loss_R = mse_loss(reconstructed_noise, noise)
         loss_R.backward()
         optimizerR.step()
 
