@@ -164,14 +164,14 @@ class Reconstructor(nn.Module):
         super(Reconstructor, self).__init__()
         self.main = nn.Sequential(
             nn.Linear(1024*4*4, 1024), 
-            nn.ReLU(True),
             nn.BatchNorm1d(1024),
+            nn.ReLU(True),
             nn.Linear(1024, 512),
-            nn.ReLU(True),
             nn.BatchNorm1d(512),
-            nn.Linear(512, 256),
             nn.ReLU(True),
+            nn.Linear(512, 256),
             nn.BatchNorm1d(256),
+            nn.ReLU(True),
             nn.Linear(256, 100)  # Matching the Generator's input size
         )
 
