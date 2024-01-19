@@ -111,7 +111,7 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
-        self.features = nn.Sequential(
+        self.main = nn.Sequential(
             # Input: 3 x 128 x 128
             nn.Conv2d(3, 64, 3, stride=2, padding=1),
             nn.BatchNorm2d(64),
@@ -142,20 +142,15 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout(0.5), # Dropout Layer
             # state size. 1024 x 4 x 4
-        )
-        self.classifier = nn.Sequential(
+
             nn.Conv2d(1024, 1, kernel_size=4, stride=1, padding=0),            
             # state size. 1 x 1 x 1
-            # nn.Sigmoid() # Commented out for VEEGAN
+            nn.Sigmoid() 
             # state size. 1
         )
-        self.to_vector = nn.Flatten()
 
-    def forward(self, input, feature=False):
-        feature_map = self.features(input)
-        if feature:
-            return self.to_vector(feature_map)
-        return self.classifier(feature_map).view(-1, 1).squeeze(1) # Remove the extra dimension
+    def forward(self, input):
+        return self.main(input).view(-1, 1).squeeze(1) # Remove the extra dimension
 
 
 # Define Reconstructor
@@ -163,7 +158,8 @@ class Reconstructor(nn.Module):
     def __init__(self):
         super(Reconstructor, self).__init__()
         self.main = nn.Sequential(
-            nn.Linear(1024*4*4, 1024), 
+            nn.Flatten(),
+            nn.Linear(3 * 128 * 128, 1024), 
             nn.BatchNorm1d(1024),
             nn.ReLU(True),
             nn.Linear(1024, 512),
@@ -188,15 +184,15 @@ netD = Discriminator().to(device)
 netR = Reconstructor().to(device)
 
 # Hyperparameters
-num_epochs = 5
+num_epochs = 15
 lr = 0.00002
 beta1 = 0.5
 
-optimizerD = torch.optim.SGD(netD.parameters(), lr=lr)
-optimizerG = torch.optim.SGD(netG.parameters(), lr=lr)
-optimizerR = torch.optim.SGD(netR.parameters(), lr=lr)
+optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerR = torch.optim.Adam(netR.parameters(), lr=lr, betas=(beta1, 0.999))
 
-bce_loss = nn.BCEWithLogitsLoss()
+bce_loss = nn.BCELoss()
 mse_loss = nn.MSELoss()
 
 dataloader_length = len(dataloader)
@@ -242,19 +238,18 @@ for epoch in range(1, num_epochs + 1):
         loss_D.backward()
         optimizerD.step()
 
-        # Train Generator
+        # Train Generator and Reconstructor
         optimizerG.zero_grad()
         fake_output = netD(fake).view(-1)
         loss_G = bce_loss(fake_output, real_labels)
-        loss_G.backward()
-        optimizerG.step()
 
-        # Train Reconstructor
         optimizerR.zero_grad()
-        feature_map_fake = netD(fake.detach(), feature=True)
-        reconstructed_noise = netR(feature_map_fake)
+        reconstructed_noise = netR(fake)
         loss_R = mse_loss(reconstructed_noise, noise)
-        loss_R.backward()
+
+        total_loss_G = loss_G + loss_R
+        total_loss_G.backward()
+        optimizerG.step()
         optimizerR.step()
 
         # Save Losses for plotting later

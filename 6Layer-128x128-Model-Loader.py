@@ -73,5 +73,5 @@ def main(model_path):
     plt.imsave('produced_images/4x4ForPresentation.png', grid.transpose(1, 2, 0))
 
 if __name__ == "__main__":
-    model_path = 'model_states/6-layer/Gen-6Layer-128x128-Optimized.pth'
+    model_path = 'model_states/6-layer/Gen-6Layer-128x128.pth'
     main(model_path)
