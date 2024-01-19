@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from torchvision import transforms
 from torchvision import datasets
@@ -167,8 +168,13 @@ class Discriminator(nn.Module):
             # state size. 1
         )
 
-    def forward(self, input):
-        return self.main(input).view(-1, 1).squeeze(1) # Remove the extra dimension
+    def forward(self, input, feature_matching=False):
+        if feature_matching:
+            # Extract features from an intermediate layer
+            features = self.main[:21](input) 
+            return features
+        else:
+            return self.main(input).view(-1, 1).squeeze(1)
 
     
 def add_noise_to_image(image, mean=0.0, std=0.1):
@@ -224,8 +230,22 @@ for epoch in range(1, num_epochs + 1):
         # Train Generator
         netG.zero_grad()
         label.fill_(1)  # The generator wants the discriminator to think the fake images are real
+
+        # Forward pass through discriminator with feature matching
+        features_real = netD(real_data, feature_matching=True)
+        fake = netG(noise)
+        fake = add_noise_to_image(fake)
+        features_fake = netD(fake, feature_matching=True)
+
+        # Calculate feature matching loss
+        feature_matching_loss = F.mse_loss(features_fake, features_real.detach())
+
+        # Calculate adversarial loss
         output = netD(fake).view(-1)
-        errG = criterion(output, label)
+        adversarial_loss = criterion(output, label)
+
+        # Combine losses (you may want to weight these losses)
+        errG = adversarial_loss + feature_matching_loss
         errG.backward()
         optimizerG.step()
 
