@@ -161,9 +161,11 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout(0.5),  # Dropout Layer
             # state size. 1024 x 4 x 4
-
             nn.Conv2d(1024, 1, kernel_size=4, stride=1, padding=0),
             # state size. 1 x 1 x 1
+            nn.Flatten(),
+            MinibatchDiscrimination(1, 64, 100),
+            nn.Linear(65, 1),
             nn.Sigmoid()
             # state size. 1
         )
@@ -175,6 +177,67 @@ class Discriminator(nn.Module):
             return features
         else:
             return self.main(input).view(-1, 1).squeeze(1)
+
+
+class MinibatchDiscrimination(nn.Module):
+    def __init__(self, in_features, out_features, kernel_dims, mean=False):
+        super(MinibatchDiscrimination, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.kernel_dims = kernel_dims
+        self.T = nn.Parameter(torch.Tensor(in_features, out_features * kernel_dims))
+        nn.init.normal_(self.T, 0, 1)
+        self.mean = mean
+
+    def forward(self, x):
+        print("Shape entering MinibatchDiscrimination:", x.shape)
+        print("Shape of T:", self.T.shape)
+        # Reshape input tensor to multiply with T
+        matrices = x.mm(self.T).view(-1, self.out_features, self.kernel_dims)
+        print("Shape of matrices:", matrices.shape)
+        
+        # Calculate L1 distance between minibatch samples
+        M = torch.abs(matrices.unsqueeze(0) - matrices.unsqueeze(1)).sum(3)
+        M = torch.exp(-M)  # Apply negative exponential
+
+        # Sum over the minibatch samples
+        if self.mean:
+            o_b = M.mean(0).mean(1)
+        else:
+            o_b = M.sum(0).sum(1)
+
+        # Concatenate the output features with the input features
+        o_b = o_b.view(x.size(0), -1)
+        print("Shape of o_b before concat:", o_b.shape)  # Debugging print
+        result = torch.cat([x, o_b], 1)
+        print("Shape exiting MinibatchDiscrimination:", result.shape)
+        return result
+
+
+class MinibatchDiscrimination(nn.Module):
+    def __init__(self, in_features, out_features, kernel_dims):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.kernel_dims = kernel_dims
+
+        self.T = nn.Parameter(torch.Tensor(in_features, out_features, kernel_dims))
+        nn.init.normal_(self.T, 0, 1)
+
+    def forward(self, x):
+        # x is NxA
+        # T is AxBxC
+        matrices = x.mm(self.T.view(self.in_features, -1)) # NxBxC
+        matrices = matrices.view(-1, self.out_features, self.kernel_dims) # NxBxC
+
+        M = matrices.unsqueeze(0)  # 1xNxBxC, M is M_i,b in the paper
+        M_T = M.permute(1, 0, 2, 3)  # Nx1xBxC, M_T is M_j,b in the paper
+        norm = torch.abs(M - M_T).sum(3)  # NxNxB
+        norm_e = torch.exp(-norm) # exp(-||M_i,b - M_j,b||_L1)
+        o_b = (norm_e.sum(0) - 1)   # NxB, subtract 1 because a vector is fully similar to itself but is counted in the exp(-norm) term
+
+        x = torch.cat([x, o_b], 1)
+        return x
 
     
 def add_noise_to_image(image, mean=0.0, std=0.1):
@@ -201,6 +264,9 @@ dataloader_length = len(dataloader)
 gen_loss = []
 dis_loss = []
 batch_count = []
+
+feature_matching_loss_weight = 0.5
+adversarial_loss_weight = 1
 
 # Training Loop
 for epoch in range(1, num_epochs + 1):
@@ -232,10 +298,12 @@ for epoch in range(1, num_epochs + 1):
         label.fill_(1)  # The generator wants the discriminator to think the fake images are real
 
         # Forward pass through discriminator with feature matching
-        features_real = netD(real_data, feature_matching=True)
         fake = netG(noise)
         fake = add_noise_to_image(fake)
+
+        # Extract Features
         features_fake = netD(fake, feature_matching=True)
+        features_real = netD(real_data, feature_matching=True)
 
         # Calculate feature matching loss
         feature_matching_loss = F.mse_loss(features_fake, features_real.detach())
@@ -245,7 +313,7 @@ for epoch in range(1, num_epochs + 1):
         adversarial_loss = criterion(output, label)
 
         # Combine losses (you may want to weight these losses)
-        errG = adversarial_loss + feature_matching_loss
+        errG = adversarial_loss_weight * adversarial_loss + feature_matching_loss_weight * feature_matching_loss
         errG.backward()
         optimizerG.step()
 
