@@ -169,13 +169,8 @@ class Discriminator(nn.Module):
             # state size. 1
         )
 
-    def forward(self, input, feature_matching=False):
-        if feature_matching:
-            # Extract features from an intermediate layer
-            features = self.main[:21](input) 
-            return features
-        else:
-            return self.main(input).view(-1, 1).squeeze(1)
+    def forward(self, input):
+        return self.main(input).view(-1, 1).squeeze(1)
 
 
 class MinibatchDiscrimination(nn.Module):
