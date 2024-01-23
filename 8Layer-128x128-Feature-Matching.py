@@ -161,9 +161,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout(0.5),  # Dropout Layer
             # state size. 1024 x 4 x 4
-            nn.Flatten(),
-            MinibatchDiscrimination(1024 * 4 * 4, 128, 16),
-            nn.Linear(1024 * 4 * 4 + 128, 1),
+            nn.Conv2d(1024, 1, 4, stride=1, padding=0),
             # state size. 1 x 1 x 1
             nn.Sigmoid()
             # state size. 1
@@ -176,35 +174,6 @@ class Discriminator(nn.Module):
             return features
         else:
             return self.main(input).view(-1, 1).squeeze(1)
-
-
-class MinibatchDiscrimination(nn.Module):
-    def __init__(self, in_features, out_features, kernel_dims):
-        super().__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.kernel_dims = kernel_dims
-
-        self.T = nn.Parameter(torch.Tensor(in_features, out_features, kernel_dims))
-        nn.init.normal_(self.T, 0, 1)
-
-    def forward(self, x):
-        # x is NxA
-        # T is AxBxC
-        print(self.T.view(self.in_features, -1).shape)
-        matrices = x.matmul(self.T.view(self.in_features, -1)) # NxBxC
-        print(matrices.shape)
-        matrices = matrices.view(-1, self.out_features, self.kernel_dims) # NxBxC
-        print(matrices.shape)
-
-        M = matrices.unsqueeze(0)  # 1xNxBxC, M_i,b in the paper
-        M_T = M.permute(1, 0, 2, 3)  # Nx1xBxC, M_j,b in the paper
-        norm = torch.abs(M - M_T).sum(3)  # NxNxB
-        norm_e = torch.exp(-norm) # exp(-||M_i,b - M_j,b||_L1)
-        o_b = (norm_e.sum(0) - 1)   # NxB, subtract 1 because a vector is fully similar to itself but is counted in the exp(-norm) term
-
-        x = torch.cat([x, o_b], 1)
-        return x
 
     
 def add_noise_to_image(image, mean=0.0, std=0.1):
@@ -232,7 +201,7 @@ gen_loss = []
 dis_loss = []
 batch_count = []
 
-feature_matching_loss_weight = 0
+feature_matching_loss_weight = 0.5
 adversarial_loss_weight = 1
 
 # Training Loop
@@ -263,8 +232,24 @@ for epoch in range(1, num_epochs + 1):
         # Train Generator
         netG.zero_grad()
         label.fill_(1)  # The generator wants the discriminator to think the fake images are real
+
+        # Forward pass through discriminator with feature matching
+        fake = netG(noise)
+        fake = add_noise_to_image(fake)
+
+        # Extract Features
+        features_fake = netD(fake, feature_matching=True)
+        features_real = netD(real_data, feature_matching=True)
+
+        # Calculate feature matching loss
+        feature_matching_loss = F.mse_loss(features_fake, features_real.detach())
+
+        # Calculate adversarial loss
         output = netD(fake).view(-1)
-        errG = criterion(output, label)
+        adversarial_loss = criterion(output, label)
+
+        # Combine losses (you may want to weight these losses)
+        errG = adversarial_loss_weight * adversarial_loss + feature_matching_loss_weight * feature_matching_loss
         errG.backward()
         optimizerG.step()
 
