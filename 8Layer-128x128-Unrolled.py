@@ -9,6 +9,7 @@ import numpy as np
 import math
 from PIL import Image
 import os
+import copy
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -161,9 +162,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout(0.5),  # Dropout Layer
             # state size. 1024 x 4 x 4
-            nn.Flatten(),
-            MinibatchDiscrimination(1024 * 4 * 4, 128, 16),
-            nn.Linear(1024 * 4 * 4 + 128, 1),
+            nn.Conv2d(1024, 1, 4, stride=1, padding=0),
             # state size. 1 x 1 x 1
             nn.Sigmoid()
             # state size. 1
@@ -173,32 +172,6 @@ class Discriminator(nn.Module):
         return self.main(input).view(-1, 1).squeeze(1)
 
 
-class MinibatchDiscrimination(nn.Module):
-    def __init__(self, in_features, out_features, kernel_dims):
-        super().__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.kernel_dims = kernel_dims
-
-        self.T = nn.Parameter(torch.Tensor(in_features, out_features, kernel_dims))
-        nn.init.normal_(self.T, 0, 1)
-
-    def forward(self, x):
-        # x is NxA
-        # T is AxBxC
-        matrices = x.matmul(self.T.view(self.in_features, -1)) # NxBxC
-        matrices = matrices.view(-1, self.out_features, self.kernel_dims) # NxBxC
-
-        M = matrices.unsqueeze(0)  # 1xNxBxC, M_i,b in the paper
-        M_T = M.permute(1, 0, 2, 3)  # Nx1xBxC, M_j,b in the paper
-        norm = torch.abs(M - M_T).sum(3)  # NxNxB
-        norm_e = torch.exp(-norm) # exp(-||M_i,b - M_j,b||_L1)
-        o_b = (norm_e.sum(0) - 1)   # NxB, subtract 1 because a vector is fully similar to itself but is counted in the exp(-norm) term
-
-        x = torch.cat([x, o_b], 1)
-        return x
-
-    
 def add_noise_to_image(image, mean=0.0, std=0.1):
     noise = torch.randn_like(image) * std + mean
     return image + noise
@@ -227,6 +200,9 @@ batch_count = []
 feature_matching_loss_weight = 0
 adversarial_loss_weight = 1
 
+# Number of steps to unroll the discriminator
+unroll_steps = 5
+
 # Training Loop
 for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
@@ -241,7 +217,7 @@ for epoch in range(1, num_epochs + 1):
         output = netD(real_data).view(-1)
         errD_real = criterion(output, label)
         errD_real.backward()
-        
+
         noise = torch.randn(batch_size, 100, 1, 1, device=device)
         fake = netG(noise)
         fake = add_noise_to_image(fake)
@@ -252,7 +228,20 @@ for epoch in range(1, num_epochs + 1):
         errD = errD_real + errD_fake
         optimizerD.step()
 
-        # Train Generator
+        # Save the current state of the discriminator
+        backupD = copy.deepcopy(netD.state_dict())
+
+        # Unroll discriminator for k steps
+        for _ in range(unroll_steps):
+            output = netD(real_data).view(-1)
+            errD_real = criterion(output, label)
+            errD_real.backward()
+            output = netD(fake.detach()).view(-1)
+            errD_fake = criterion(output, label)
+            errD_fake.backward()
+            optimizerD.step()
+
+        # Train Generator based on unrolled discriminator
         netG.zero_grad()
         label.fill_(1)  # The generator wants the discriminator to think the fake images are real
         output = netD(fake).view(-1)
@@ -260,13 +249,16 @@ for epoch in range(1, num_epochs + 1):
         errG.backward()
         optimizerG.step()
 
+        # Restore the discriminator to its state before unrolling
+        netD.load_state_dict(backupD)
+
         # Save Losses for plotting later
         gen_loss.append(errG.item())
         dis_loss.append(errD.item())
-        batch_count.append(i + dataloader_length * epoch)
+        batch_count.append(i + len(dataloader) * epoch)
 
         if i % 50 == 0:
-            print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
+            print(f'[{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
 print("Training is complete!")
 
