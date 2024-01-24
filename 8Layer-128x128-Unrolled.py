@@ -197,9 +197,6 @@ gen_loss = []
 dis_loss = []
 batch_count = []
 
-feature_matching_loss_weight = 0
-adversarial_loss_weight = 1
-
 # Number of steps to unroll the discriminator
 unroll_steps = 5
 

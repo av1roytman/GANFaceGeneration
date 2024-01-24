@@ -224,9 +224,6 @@ gen_loss = []
 dis_loss = []
 batch_count = []
 
-feature_matching_loss_weight = 0
-adversarial_loss_weight = 1
-
 # Training Loop
 for epoch in range(1, num_epochs + 1):
     for i, data in enumerate(dataloader, 0):
