@@ -1,6 +1,6 @@
 # GANGenerationDetection_F23
 
-Authors: Avi, Abhiram, Ashwin, and Kris
+Authors: Avi, Abhiram, Ashwin, Chris, and Kris
 
 Files:
 
