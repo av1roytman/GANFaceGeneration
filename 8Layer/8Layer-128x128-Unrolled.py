@@ -42,7 +42,7 @@ transform = transforms.Compose([
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalizing to [-1, 1]
 ])
 
-image_dir = 'img_align_celeba'
+image_dir = '../img_align_celeba'
 
 # Create a dataset
 dataset = CelebADataset(image_dir=image_dir, transform=transform)
@@ -67,7 +67,7 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-base = 'produced_images/8-layer'
+base = '../produced_images/8-layer'
 plt.savefig(os.path.join(base, 'celeba_sample_128.png'))
 plt.close(fig)
 
@@ -81,7 +81,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 15
+num_epochs = 5
 lr = 0.00001
 beta1 = 0.5
 
@@ -98,7 +98,7 @@ dis_loss = []
 batch_count = []
 
 # Number of steps to unroll the discriminator
-unroll_steps = 5
+unroll_steps = 3
 
 # Training Loop
 for epoch in range(1, num_epochs + 1):
@@ -160,8 +160,8 @@ for epoch in range(1, num_epochs + 1):
 print("Training is complete!")
 
 # Save the trained model
-model_base = 'model_states/8-layer'
-torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-8Layer-128x128.pth'))
+model_base = '../model_states/8-layer'
+torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-8Layer-128x128-Unrolled.pth'))
 
 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
 
@@ -181,7 +181,7 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-plt.savefig(os.path.join(base, '8Layer-128x128.png'))
+plt.savefig(os.path.join(base, '8Layer-128x128-Unrolled.png'))
 plt.close(fig)
 
 # Graph the Loss
@@ -192,5 +192,5 @@ plt.plot(batch_count, dis_loss, label="Discriminator")
 plt.xlabel("Batch Count")
 plt.ylabel("Loss")
 plt.legend()
-plt.savefig(os.path.join(base, 'Loss_8Layer-128x128.png'))
+plt.savefig(os.path.join(base, 'Loss_8Layer-128x128-Unrolled.png'))
 plt.close()

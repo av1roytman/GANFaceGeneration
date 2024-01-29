@@ -41,7 +41,7 @@ transform = transforms.Compose([
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalizing to [-1, 1]
 ])
 
-image_dir = 'img_align_celeba'
+image_dir = '../img_align_celeba'
 
 # Create a dataset
 dataset = CelebADataset(image_dir=image_dir, transform=transform)
@@ -66,7 +66,7 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-base = 'produced_images/8-layer'
+base = '../produced_images/8-layer'
 plt.savefig(os.path.join(base, 'celeba_sample_128.png'))
 plt.close(fig)
 
@@ -115,7 +115,7 @@ netD = Discriminator().to(device)
 netE = Encoder().to(device)
 
 # Hyperparameters
-num_epochs = 15
+num_epochs = 5
 lr = 0.00001
 beta1 = 0.5
 
@@ -187,7 +187,7 @@ for epoch in range(1, num_epochs + 1):
 print("Training is complete!")
 
 # Save the trained model
-model_base = 'model_states/8-layer'
+model_base = '../model_states/8-layer'
 torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-8Layer-128x128-Reconstruction.pth'))
 
 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
