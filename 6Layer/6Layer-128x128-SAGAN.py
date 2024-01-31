@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.utils as utils
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 from torchvision import transforms
 from torchvision import datasets
@@ -9,8 +9,6 @@ import numpy as np
 import math
 from PIL import Image
 import os
-from Basic.Generator import Generator
-from Basic.Discriminator import Discriminator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -70,48 +68,130 @@ base = '../produced_images/6-layer'
 plt.savefig(os.path.join(base, 'celeba_sample_128.png'))
 plt.close(fig)
 
-# Encoder for Reconstruction
-class Encoder(nn.Module):
+
+# Define Generator Class
+class Generator(nn.Module):
     def __init__(self):
-        super(Encoder, self).__init__()
+        super(Generator, self).__init__()
         self.main = nn.Sequential(
-            # Input: 3 x 128 x 128
-            nn.Conv2d(3, 64, 3, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(True),
-            # state size. 64 x 64 x 64
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(True),
-            # state size. 128 x 32 x 32
-            nn.Conv2d(128, 256, 3, stride=2, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(True),
-            # state size. 256 x 16 x 16
-            nn.Conv2d(256, 512, 3, stride=2, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(True),
-            # state size. 512 x 8 x 8
-            nn.Conv2d(512, 1024, 3, stride=2, padding=1),
+            # input is Z, going into a convolution
+            nn.ConvTranspose2d(100, 1024, 4, 1, 0, bias=False),
             nn.BatchNorm2d(1024),
             nn.ReLU(True),
             # state size. 1024 x 4 x 4
-            nn.Conv2d(1024, 100, 4, stride=1, padding=0),
-            # state size. 100 x 1 x 1
+            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(True),
+            # state size. 512 x 8 x 8
+            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(256),
+            nn.ReLU(True),
+            # state size. 256 x 16 x 16
+
+            SelfAttention(256), # Self-Attention Layer
+            # state size. 256 x 16 x 16
+
+            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            # state size. 128 x 32 x 32
+
+            SelfAttention(128), # Self-Attention Layer
+            # state size. 128 x 32 x 32
+
+            nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=False), 
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            # state size. 64 x 64 x 64
+
+            nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False),  # Output 3 channels for RGB
+            nn.Tanh()
+            # state size. 3 x 128 x 128
         )
 
     def forward(self, input):
-        return self.main(input).view(-1, 100, 1, 1)
-        # state size. 100
+        return self.main(input)
 
 
+# Define the Discriminator
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.main = nn.Sequential(
+            # Input: 3 x 128 x 128
+            utils.spectral_norm(nn.Conv2d(3, 64, 3, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
+            # state size. 64 x 64 x 64
+
+            utils.spectral_norm(nn.Conv2d(64, 128, 3, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
+            # state size. 128 x 32 x 32
+
+            SelfAttention(128), # Self-Attention Layer
+            # state size. 128 x 32 x 32
+
+            utils.spectral_norm(nn.Conv2d(128, 256, 3, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
+            # state size. 256 x 16 x 16
+
+            SelfAttention(256), # Self-Attention Layer
+            # state size. 256 x 16 x 16
+
+            utils.spectral_norm(nn.Conv2d(256, 512, 3, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
+            # state size. 512 x 8 x 8
+
+            utils.spectral_norm(nn.Conv2d(512, 1024, 3, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.5), # Dropout Layer
+            # state size. 1024 x 4 x 4
+
+            utils.spectral_norm(nn.Conv2d(1024, 1, kernel_size=4, stride=1, padding=0)),
+            # state size. 1 x 1 x 1
+            # nn.Sigmoid() # No Sigmoid function (bounded activation function) when using Hinge Loss
+            # state size. 1
+        )
+
+    def forward(self, input):
+        return self.main(input).view(-1, 1).squeeze(1) # Remove the extra dimension
+
+
+class SelfAttention(nn.Module):
+    def __init__(self, in_dim):
+        super(SelfAttention, self).__init__()
+        self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
+        self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
+        self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
+        self.gamma = nn.Parameter(torch.zeros(1))
+        self. out_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
+
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        batch_size, C, width, height = x.size()
+        query = self.query_conv(x).view(batch_size, -1, width * height).permute(0, 2, 1)
+        key = self.key_conv(x).view(batch_size, -1, width * height)
+        value = self.value_conv(x).view(batch_size, -1, width * height).permute(0, 2, 1)
+
+        attention = torch.bmm(query, key)
+        attention = self.softmax(attention)
+
+        out = torch.bmm(value, attention.permute(0, 2, 1))
+        out = out.view(batch_size, C, width, height)
+        out = self.out_conv(out)
+
+        return self.gamma * out + x  # Skip connection
+    
 # Model Initialization
 netG = Generator().to(device)
 netD = Discriminator().to(device)
-netE = Encoder().to(device)
 
 # Hyperparameters
-num_epochs = 30
+num_epochs = 100
 lr = 0.0001
 beta1 = 0.5
 
@@ -120,16 +200,12 @@ criterion = nn.BCELoss()
 
 optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-5, betas=(beta1, 0.999))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
-optimizerE = torch.optim.Adam(netE.parameters(), lr=lr, betas=(beta1, 0.999))
 
 dataloader_length = len(dataloader)
 
 gen_loss = []
 dis_loss = []
 batch_count = []
-
-reconstruction_loss = 0.5
-adversarial_loss_weight = 1
 
 # Training Loop
 for epoch in range(1, num_epochs + 1):
@@ -142,14 +218,14 @@ for epoch in range(1, num_epochs + 1):
         # Train Discriminator
         netD.zero_grad()
         output = netD(real_data).view(-1)
-        errD_real = criterion(output, label)
+        errD_real = torch.mean(torch.relu(1.0 - output))
         errD_real.backward()
         
         noise = torch.randn(batch_size, 100, 1, 1, device=device)
         fake = netG(noise)
         label.fill_(0)
         output = netD(fake.detach()).view(-1)
-        errD_fake = criterion(output, label)
+        errD_fake = torch.mean(torch.relu(1.0 + output))
         errD_fake.backward()
         errD = errD_real + errD_fake
         optimizerD.step()
@@ -158,15 +234,7 @@ for epoch in range(1, num_epochs + 1):
         netG.zero_grad()
         label.fill_(1)  # The generator wants the discriminator to think the fake images are real
         output = netD(fake).view(-1)
-        adversarial_loss = criterion(output, label)
-
-        # Reconstruction Loss
-        encoded_real = netE(real_data)
-        reconstructed = netG(encoded_real)
-
-        recon_loss = F.mse_loss(reconstructed, real_data)
-
-        errG = adversarial_loss * adversarial_loss_weight + recon_loss * reconstruction_loss
+        errG = -torch.mean(netD(output))
         errG.backward()
         optimizerG.step()
 
@@ -182,7 +250,7 @@ print("Training is complete!")
 
 # Save the trained model
 model_base = '../model_states/6-layer'
-torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-Reconstruction.pth'))
+torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN.pth'))
 
 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
 
@@ -202,7 +270,7 @@ for i in range(9):
     axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
     axes[i].axis('off')  # Turn off axes for cleaner look
 
-plt.savefig(os.path.join(base, '6Layer-128x128-Reconstruction.png'))
+plt.savefig(os.path.join(base, '6Layer-128x128-SAGAN.png'))
 plt.close(fig)
 
 # Graph the Loss
@@ -213,5 +281,5 @@ plt.plot(batch_count, dis_loss, label="Discriminator")
 plt.xlabel("Batch Count")
 plt.ylabel("Loss")
 plt.legend()
-plt.savefig(os.path.join(base, 'Loss_6Layer-128x128-Reconstruction.png'))
+plt.savefig(os.path.join(base, 'Loss_6Layer-128x128-SAGAN.png'))
 plt.close()
