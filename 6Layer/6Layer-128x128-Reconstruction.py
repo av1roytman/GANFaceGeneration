@@ -111,14 +111,14 @@ netD = Discriminator().to(device)
 netE = Encoder().to(device)
 
 # Hyperparameters
-num_epochs = 6
+num_epochs = 30
 lr = 0.0001
 beta1 = 0.5
 
 # Binary cross entropy loss and optimizer
 criterion = nn.BCELoss()
 
-optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=lr/2, betas=(beta1, 0.999))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerE = torch.optim.Adam(netE.parameters(), lr=lr, betas=(beta1, 0.999))
 
