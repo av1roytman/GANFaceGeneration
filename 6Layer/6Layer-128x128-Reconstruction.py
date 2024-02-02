@@ -118,7 +118,7 @@ beta1 = 0.5
 # Binary cross entropy loss and optimizer
 criterion = nn.BCELoss()
 
-optimizerD = torch.optim.Adam(netD.parameters(), lr=1e-5, betas=(beta1, 0.999))
+optimizerD = torch.optim.Adam(netD.parameters(), lr=lr/2, betas=(beta1, 0.999))
 optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerE = torch.optim.Adam(netE.parameters(), lr=lr, betas=(beta1, 0.999))
 
