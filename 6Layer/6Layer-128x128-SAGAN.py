@@ -90,6 +90,8 @@ class Generator(nn.Module):
             nn.ReLU(True),
             # state size. 256 x 16 x 16
 
+            SelfAttention(256), # Self-Attention Layer
+
             nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),
             nn.BatchNorm2d(128),
             nn.ReLU(True),
@@ -135,6 +137,8 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             # nn.Dropout(0.5), # Dropout Layer
             # state size. 256 x 16 x 16
+
+            SelfAttention(256), # Self-Attention Layer
 
             utils.spectral_norm(nn.Conv2d(256, 512, 3, stride=2, padding=1)),
             nn.LeakyReLU(0.2, inplace=True),
