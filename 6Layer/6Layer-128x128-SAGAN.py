@@ -10,7 +10,7 @@ import math
 from PIL import Image
 import os
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 class CelebADataset(Dataset):
     def __init__(self, image_dir, transform=None, num_samples=None):
@@ -45,7 +45,7 @@ image_dir = '../img_align_celeba'
 dataset = CelebADataset(image_dir=image_dir, transform=transform)
 
 # Batch Size Hyperparameter
-global_batch_size = 64
+global_batch_size = 16
 
 # Create a data loader
 # num_gpus = torch.cuda.device_count()
@@ -105,6 +105,8 @@ class Generator(nn.Module):
             nn.ReLU(True),
             # state size. 64 x 64 x 64
 
+            SelfAttention(64), # Self-Attention Layer
+
             utils.spectral_norm(nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False)),  # Output 3 channels for RGB
             nn.Tanh()
             # state size. 3 x 128 x 128
@@ -124,6 +126,8 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             # nn.Dropout(0.5), # Dropout Layer
             # state size. 64 x 64 x 64
+
+            SelfAttention(64), # Self-Attention Layer
 
             utils.spectral_norm(nn.Conv2d(64, 128, 3, stride=2, padding=1)),
             nn.LeakyReLU(0.2, inplace=True),
@@ -191,7 +195,7 @@ netG = Generator().to(device)
 netD = Discriminator().to(device)
 
 # Hyperparameters
-num_epochs = 50
+num_epochs = 30
 lr = 0.0001
 beta1 = 0
 beta2 = 0.9
