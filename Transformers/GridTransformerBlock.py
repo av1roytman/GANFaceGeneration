@@ -62,7 +62,7 @@ class GridTransformerBlock(nn.Module):
     def __init__(self, embed_dim, num_heads, ff_dim, dropout=0.1):
         super(GridTransformerBlock, self).__init__()
 
-        # Multi-Head Self-Attention
+        # Grid Self-Attention
         self.self_attn = GridSelfAttention(embed_dim)
 
         # Feed Forward Network

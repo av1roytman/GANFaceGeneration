@@ -14,7 +14,6 @@ class Generator(nn.Module):
             nn.ReLU(True)
         )
         
-        # Define transformer blocks for stage 1
         self.blocks_stage1 = nn.Sequential(*[TransformerBlock(embed_dim, num_heads, ff_dim, dropout) for _ in range(5)])
         
         # Upsampling layers and transformer blocks for stages 2, 3, and pixel shuffle for stages 4, 5, 6
@@ -33,10 +32,9 @@ class Generator(nn.Module):
         self.pixel_shuffle_stage6 = nn.PixelShuffle(2)
         self.grid_blocks_stage6 = nn.Sequential(*[GridTransformerBlock(16, num_heads, ff_dim, dropout) for _ in range(4)])
         
-        # Final linear layer to produce the output image
         self.final_layer = nn.Sequential(
-            nn.Conv2d(16, 3, kernel_size=1, stride=1, padding=0),  # Assuming a flattening step before this layer, adjust as necessary
-            nn.Tanh()  # Commonly used activation function for GANs to output values in [-1, 1]
+            nn.Conv2d(16, 3, kernel_size=1, stride=1, padding=0),
+            nn.Tanh()
         )
 
     def forward(self, noise):
