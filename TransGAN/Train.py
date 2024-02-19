@@ -12,7 +12,8 @@ from Helpers import generate_images, generate_loss_graphs
 from torch.cuda.amp import autocast, GradScaler
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device2 = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
     # Reshape data and scale to [-1, 1]
     transform = transforms.Compose([
@@ -27,7 +28,7 @@ def main():
     dataset = CelebADataset(image_dir=image_dir, transform=transform)
 
     # Batch Size Hyperparameter
-    global_batch_size = 8
+    global_batch_size = 2
 
     # Create a data loader
     # num_gpus = torch.cuda.device_count()
@@ -57,15 +58,14 @@ def main():
     netG = Generator(noise_dim=100, embed_dim=64, num_heads=4, ff_dim=2048, dropout=0.1)
     netD = Discriminator(embed_dim=64, num_heads=4, ff_dim=2048, dropout=0.1)
 
-    # If there are multiple GPUs, wrap the model with nn.DataParallel
-    if torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        netG = nn.DataParallel(netG)
-        netD = nn.DataParallel(netD)
+    # if torch.cuda.device_count() > 1:
+    #     print("Let's use", torch.cuda.device_count(), "GPUs!")
+    #     netG = nn.DataParallel(netG)
+    #     netD = nn.DataParallel(netD)
 
     # Move the model to GPU
     netG.to(device)
-    netD.to(device)
+    netD.to(device2)
 
     # Hyperparameters
     num_epochs = 150
@@ -88,7 +88,7 @@ def main():
     for epoch in range(1, num_epochs + 1):
         for i, data in enumerate(dataloader, 0):
             # Transfer data tensor to GPU/CPU (device)
-            real_data = data.to(device)
+            real_data = data.to(device2)
             batch_size = real_data.size(0)
 
             # Train Discriminator

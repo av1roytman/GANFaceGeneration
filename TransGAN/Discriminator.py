@@ -15,15 +15,15 @@ class Discriminator(nn.Module):
         )
 
         # Stage 1: Transformer blocks and average pooling
-        self.blocks_stage1 = nn.Sequential(*[TransformerBlock(embed_dim, num_heads, ff_dim, dropout) for _ in range(1)])
+        self.blocks_stage1 = nn.Sequential(*[TransformerBlock(embed_dim, num_heads, ff_dim, dropout) for _ in range(3)])
         self.avg_pool_stage1 = nn.AvgPool2d(2)
 
         # Stage 2: Transformer blocks and average pooling
-        self.blocks_stage2 = nn.Sequential(*[TransformerBlock(embed_dim*2, num_heads, ff_dim, dropout) for _ in range(1)])
+        self.blocks_stage2 = nn.Sequential(*[TransformerBlock(embed_dim*2, num_heads, ff_dim, dropout) for _ in range(3)])
         self.avg_pool_stage2 = nn.AvgPool2d(2)
 
         # Stage 3: Transformer blocks
-        self.blocks_stage3 = nn.Sequential(*[TransformerBlock(embed_dim*4, num_heads, ff_dim, dropout) for _ in range(1)])
+        self.blocks_stage3 = nn.Sequential(*[TransformerBlock(embed_dim*4, num_heads, ff_dim, dropout) for _ in range(3)])
 
         # Final transformer block and classification head
         self.final_block = TransformerBlock(embed_dim*4, num_heads, ff_dim, dropout)
@@ -48,7 +48,7 @@ class Discriminator(nn.Module):
         x = self.blocks_stage3(x)
 
         # Add CLS token
-        cls_token = torch.zeros(x.shape[0], 1, x.shape[2], x.shape[3], device=x.device)
+        cls_token = torch.zeros(x.shape[0], 1, 1, 1, device=x.device)
         x = torch.cat([cls_token, x], dim=1)
 
         # Final transformer block and classification head
