@@ -11,7 +11,7 @@ from PIL import Image
 import os
 
 def main():
-    device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Reshape data and scale to [-1, 1]
     transform = transforms.Compose([
@@ -52,8 +52,14 @@ def main():
     plt.close(fig)
 
     # Model Initialization
-    netG = Generator().to(device)
-    netD = Discriminator().to(device)
+    netG = Generator()
+    netD = Discriminator()
+
+    netG = nn.DataParallel(netG)
+    netD = nn.DataParallel(netD)
+
+    netG = netG.to(device)
+    netD = netD.to(device)
 
     # Hyperparameters
     num_epochs = 150
