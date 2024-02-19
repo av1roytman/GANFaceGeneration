@@ -113,7 +113,8 @@ def main():
                 print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
             if epoch % 25 == 0 and i == 0:
-                generate_images(netG, label=f'Epoch-{epoch}')
+                fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
+                generate_images(netG, base, fixed_noise, label=f'Epoch-{epoch}')
                 generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
                 torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN.pth'))
                 torch.save(netD.state_dict(), os.path.join(model_base, 'Dis-6Layer-128x128-SAGAN.pth'))
@@ -123,7 +124,8 @@ def main():
     # Save the trained model
     torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN.pth'))
 
-    generate_images(netG, label='Final')
+    fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
+    generate_images(netG, base, fixed_noise, label='Final')
     generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
 
 
@@ -302,7 +304,7 @@ def generate_loss_graphs(gen_loss, dis_loss, batch_count, base):
     plt.xlabel("Batch Count")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig(os.path.join(base, f'Loss_6Layer-128x128-SAGAN-{batch_count}.png'))
+    plt.savefig(os.path.join(base, f'Loss_6Layer-128x128-SAGAN.png'))
     plt.close()
 
 
