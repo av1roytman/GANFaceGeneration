@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-import TransformerBlock
+from TransformerBlock import TransformerBlock
 
 class GridTransformerBlock(nn.Module):
     def __init__(self, embed_dim, num_heads, ff_dim, image_size, dropout=0.1):
