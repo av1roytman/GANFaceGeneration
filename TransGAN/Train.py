@@ -10,10 +10,11 @@ from Generator import Generator
 from Discriminator import Discriminator
 from Helpers import generate_images, generate_loss_graphs
 from torch.cuda.amp import autocast, GradScaler
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 def main():
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    device2 = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
     # Reshape data and scale to [-1, 1]
     transform = transforms.Compose([
@@ -54,18 +55,24 @@ def main():
     plt.close(fig)
 
     # Model Initialization
-    # Model Initialization
     netG = Generator(noise_dim=100, embed_dim=64, ff_dim=2048, dropout=0.1)
     netD = Discriminator(embed_dim=64, ff_dim=2048, dropout=0.1)
 
+    netG = netG.to(device)
+    netD = netD.to(device)
+
+    # Data Parallel
     # if torch.cuda.device_count() > 1:
     #     print("Let's use", torch.cuda.device_count(), "GPUs!")
     #     netG = nn.DataParallel(netG)
     #     netD = nn.DataParallel(netD)
 
-    # Move the model to GPU
-    netG.to(device)
-    netD.to(device2)
+    # Distributed Data Parallel
+    # dist.init_process_group('nccl')
+    # device = torch.device(f'cuda:{torch.distributed.get_rank()}')
+
+    # netG = DDP(netG.to(device))
+    # netD = DDP(netD.to(device))
 
     # Hyperparameters
     num_epochs = 150
@@ -88,7 +95,7 @@ def main():
     for epoch in range(1, num_epochs + 1):
         for i, data in enumerate(dataloader, 0):
             # Transfer data tensor to GPU/CPU (device)
-            real_data = data.to(device2)
+            real_data = data.to(device)
             batch_size = real_data.size(0)
 
             # Train Discriminator
