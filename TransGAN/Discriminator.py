@@ -32,29 +32,29 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         # Initial linear layer
-        x = self.initial_linear(x)
-        x = x.view(-1, 32, 32, self.embed_dim)
+        x = self.initial_linear(x) # Size: (batch_size, 32*32*embed_dim)
+        x = x.view(-1, 32, 32, self.embed_dim) # Size: (batch_size, 32, 32, embed_dim)
 
         # Stage 1
-        x = self.blocks_stage1(x)
-        x = self.avg_pool_stage1(x)
-        x = torch.cat([x, x], dim=1)
+        x = self.blocks_stage1(x) # Size: (batch_size, 32, 32, embed_dim)
+        x = self.avg_pool_stage1(x) # Size: (batch_size, 16, 16, embed_dim)
+        x = torch.cat([x, x], dim=1) # Size: (batch_size, 16, 16, embed_dim*2)
 
         # Stage 2
-        x = self.blocks_stage2(x)
-        x = self.avg_pool_stage2(x)
-        x = torch.cat([x, x], dim=1)
+        x = self.blocks_stage2(x) # Size: (batch_size, 16, 16, embed_dim*2)
+        x = self.avg_pool_stage2(x) # Size: (batch_size, 8, 8, embed_dim*2)
+        x = torch.cat([x, x], dim=1) # Size: (batch_size, 8, 8, embed_dim*4)
 
         # Stage 3
-        x = self.blocks_stage3(x)
+        x = self.blocks_stage3(x) # Size: (batch_size, 8, 8, embed_dim*4)
 
         # Add CLS token
-        cls_token = torch.zeros(x.shape[0], 1, 1, 1, device=x.device)
-        x = torch.cat([cls_token, x], dim=1)
+        cls_token = torch.zeros(x.shape[0], 1, 1, 1, device=x.device) # Size: (batch_size, 1, 1, embed_dim*4)
+        x = torch.cat([cls_token, x], dim=1) # Size: (batch_size, 1, 1, embed_dim*4)
 
         # Final transformer block and classification head
-        x = self.final_block(x)
-        x = x[:, 0]
-        x = self.cls_head(x)
+        x = self.final_block(x) # Size: (batch_size, 1, 1, embed_dim*4)
+        x = x[:, 0] # Size: (batch_size, embed_dim*4)
+        x = self.cls_head(x) # Size: (batch_size, 1)
 
-        return x
+        return x # Size: (batch_size, 1)
