@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 
 class TransformerBlock(nn.Module):
-    def __init__(self, embed_dim, num_heads, ff_dim, dropout=0.1):
+    def __init__(self, embed_dim, ff_dim, dropout=0.1):
         super(TransformerBlock, self).__init__()
 
         # Axial Attention

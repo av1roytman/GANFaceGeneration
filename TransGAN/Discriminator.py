@@ -1,9 +1,10 @@
 import torch.nn as nn
 import torch
 from TransformerBlock import TransformerBlock
+from GridTransformerBlock import GridTransformerBlock
 
 class Discriminator(nn.Module):
-    def __init__(self, embed_dim=96, num_heads=8, ff_dim=192, dropout=0.1):
+    def __init__(self, embed_dim=96, ff_dim=192, dropout=0.1):
         super(Discriminator, self).__init__()
         self.embed_dim = embed_dim
 
@@ -15,18 +16,18 @@ class Discriminator(nn.Module):
         )
 
         # Stage 1: Transformer blocks and average pooling
-        self.blocks_stage1 = nn.Sequential(*[TransformerBlock(embed_dim, num_heads, ff_dim, dropout) for _ in range(3)])
+        self.blocks_stage1 = nn.Sequential(*[GridTransformerBlock(embed_dim, ff_dim, 32, dropout) for _ in range(3)])
         self.avg_pool_stage1 = nn.AvgPool2d(2)
 
         # Stage 2: Transformer blocks and average pooling
-        self.blocks_stage2 = nn.Sequential(*[TransformerBlock(embed_dim*2, num_heads, ff_dim, dropout) for _ in range(3)])
+        self.blocks_stage2 = nn.Sequential(*[TransformerBlock(embed_dim*2, ff_dim, dropout) for _ in range(3)])
         self.avg_pool_stage2 = nn.AvgPool2d(2)
 
         # Stage 3: Transformer blocks
-        self.blocks_stage3 = nn.Sequential(*[TransformerBlock(embed_dim*4, num_heads, ff_dim, dropout) for _ in range(3)])
+        self.blocks_stage3 = nn.Sequential(*[TransformerBlock(embed_dim*4, ff_dim, dropout) for _ in range(3)])
 
         # Final transformer block and classification head
-        self.final_block = TransformerBlock(embed_dim*4, num_heads, ff_dim, dropout)
+        self.final_block = TransformerBlock(embed_dim*4, ff_dim, dropout)
         self.cls_head = nn.Linear(embed_dim*4, 1)
 
     def forward(self, x):

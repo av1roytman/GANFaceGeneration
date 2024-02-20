@@ -55,8 +55,8 @@ def main():
 
     # Model Initialization
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=64, num_heads=4, ff_dim=2048, dropout=0.1)
-    netD = Discriminator(embed_dim=64, num_heads=4, ff_dim=2048, dropout=0.1)
+    netG = Generator(noise_dim=100, embed_dim=64, ff_dim=2048, dropout=0.1)
+    netD = Discriminator(embed_dim=64, ff_dim=2048, dropout=0.1)
 
     # if torch.cuda.device_count() > 1:
     #     print("Let's use", torch.cuda.device_count(), "GPUs!")

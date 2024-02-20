@@ -3,12 +3,12 @@ import torch
 from TransformerBlock import TransformerBlock
 
 class GridTransformerBlock(nn.Module):
-    def __init__(self, embed_dim, num_heads, ff_dim, image_size, dropout=0.1):
+    def __init__(self, embed_dim, ff_dim, image_size, dropout=0.1):
         super(GridTransformerBlock, self).__init__()
 
         self.num_blocks = image_size // 16
         self.blocks = nn.ModuleList([
-            TransformerBlock(embed_dim, num_heads, ff_dim, dropout)
+            TransformerBlock(embed_dim, ff_dim, dropout)
             for _ in range(self.num_blocks * self.num_blocks)
         ])
 
