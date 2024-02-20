@@ -11,9 +11,14 @@ from PIL import Image
 import os
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Distributed Data Parallel
+    dist.init_process_group('nccl')
+    device = torch.device(f'cuda:{torch.distributed.get_rank()}')
 
     # Reshape data and scale to [-1, 1]
     transform = transforms.Compose([
@@ -33,7 +38,8 @@ def main():
     # Create a data loader
     # num_gpus = torch.cuda.device_count()
     # print("Number of available GPUs:", num_gpus)
-    dataloader = DataLoader(dataset, batch_size=global_batch_size, shuffle=True, num_workers=8)
+    sampler = DistributedSampler(dataset)
+    dataloader = DataLoader(dataset, sampler=sampler, batch_size=global_batch_size, shuffle=False, num_workers=8)
 
     # Create a 3x3 grid for the images
     fig, axes = plt.subplots(3, 3, figsize=(9, 9))
@@ -57,14 +63,12 @@ def main():
     netG = Generator()
     netD = Discriminator()
 
-    netG = netG.to(device)
-    netD = netD.to(device)
+    # netG = netG.to(device)
+    # netD = netD.to(device)
 
     # Distributed Data Parallel
-    # dist.init_process_group('nccl')
-    # device = torch.device(f'cuda:{torch.distributed.get_rank()}')
-    # netG = DDP(netG.to(device))
-    # netD = DDP(netD.to(device))
+    netG = DDP(netG.to(device))
+    netD = DDP(netD.to(device))
 
     # Hyperparameters
     num_epochs = 150
@@ -84,6 +88,8 @@ def main():
     # Training Loop
     for epoch in range(1, num_epochs + 1):
         for i, data in enumerate(dataloader, 0):
+            sampler.set_epoch(epoch)
+
             # Transfer data tensor to GPU/CPU (device)
             real_data = data.to(device)
             batch_size = real_data.size(0)
@@ -114,13 +120,13 @@ def main():
 
             # Save Losses for plotting later
 
-            if i % 50 == 0:
+            if i % 50 == 0 and torch.distributed.get_rank() == 0:
                 gen_loss.append(errG.item())
                 dis_loss.append(errD.item())
                 batch_count.append(i + dataloader_length * epoch)
                 print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
-            if epoch % 25 == 0 and i == 0:
+            if epoch % 25 == 0 and i == 0 and torch.distributed.get_rank() == 0:
                 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
                 generate_images(netG, base, fixed_noise, label=f'Epoch-{epoch}')
                 generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
