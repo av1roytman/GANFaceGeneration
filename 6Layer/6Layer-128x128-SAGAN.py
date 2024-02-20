@@ -9,6 +9,8 @@ import numpy as np
 import math
 from PIL import Image
 import os
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,20 +57,20 @@ def main():
     netG = Generator()
     netD = Discriminator()
 
-    netG = nn.DataParallel(netG)
-    netD = nn.DataParallel(netD)
-
     netG = netG.to(device)
     netD = netD.to(device)
+
+    # Distributed Data Parallel
+    # dist.init_process_group('nccl')
+    # device = torch.device(f'cuda:{torch.distributed.get_rank()}')
+    # netG = DDP(netG.to(device))
+    # netD = DDP(netD.to(device))
 
     # Hyperparameters
     num_epochs = 150
     lr = 0.0001
     beta1 = 0
     beta2 = 0.9
-
-    # Binary cross entropy loss and optimizer
-    criterion = nn.BCELoss()
 
     optimizerD = torch.optim.Adam(netD.parameters(), lr=lr*4, betas=(beta1, beta2))
     optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, beta2))
