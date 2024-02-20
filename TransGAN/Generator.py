@@ -5,7 +5,7 @@ from TransformerBlock import TransformerBlock
 from GridTransformerBlock import GridTransformerBlock
 
 class Generator(nn.Module):
-    def __init__(self, noise_dim=512, embed_dim=1024, ff_dim=2048, dropout=0.1):
+    def __init__(self, noise_dim, embed_dim, ff_dim, dropout):
         super(Generator, self).__init__()
 
         self.embeded_dim = embed_dim

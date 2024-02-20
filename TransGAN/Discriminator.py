@@ -4,7 +4,7 @@ from TransformerBlock import TransformerBlock
 from GridTransformerBlock import GridTransformerBlock
 
 class Discriminator(nn.Module):
-    def __init__(self, embed_dim=96, ff_dim=192, dropout=0.1):
+    def __init__(self, embed_dim, ff_dim, dropout):
         super(Discriminator, self).__init__()
         self.embed_dim = embed_dim
 
