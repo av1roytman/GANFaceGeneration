@@ -55,8 +55,8 @@ def main():
     plt.close(fig)
 
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=64, ff_dim=2048, dropout=0.1)
-    netD = Discriminator(embed_dim=64, ff_dim=2048, dropout=0.1)
+    netG = Generator(noise_dim=100, embed_dim=32, ff_dim=256, dropout=0.1)
+    netD = Discriminator(embed_dim=32, ff_dim=256, dropout=0.1)
 
     netG = netG.to(device)
     netD = netD.to(device)

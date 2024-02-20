@@ -27,8 +27,8 @@ class Discriminator(nn.Module):
         self.blocks_stage3 = nn.Sequential(*[TransformerBlock(embed_dim*4, ff_dim, dropout) for _ in range(3)])
 
         # Final transformer block and classification head
-        self.final_block = TransformerBlock(embed_dim*4, ff_dim, dropout)
-        self.cls_head = nn.Linear(embed_dim*4, 1)
+        self.final_block = TransformerBlock(embed_dim*4 + 1, ff_dim, dropout)
+        self.cls_head = nn.Linear(embed_dim*4 + 1, 1)
 
     def forward(self, x):
         # Initial linear layer
@@ -36,25 +36,38 @@ class Discriminator(nn.Module):
         x = x.view(-1, 32, 32, self.embed_dim) # Size: (batch_size, 32, 32, embed_dim)
 
         # Stage 1
+        print("Embed_dim:", self.embed_dim)
+        print("Stage 1 input shape:", x.shape)
         x = self.blocks_stage1(x) # Size: (batch_size, 32, 32, embed_dim)
+        print("Stage 1 block 1 shape:", x.shape)
         x = self.avg_pool_stage1(x) # Size: (batch_size, 16, 16, embed_dim)
+        print("Stage 1 avg pool shape:", x.shape)
         x = torch.cat([x, x], dim=1) # Size: (batch_size, 16, 16, embed_dim*2)
+        print("Stage 1 output shape:", x.shape)
 
         # Stage 2
+        print("Stage 2 input shape:", x.shape)
         x = self.blocks_stage2(x) # Size: (batch_size, 16, 16, embed_dim*2)
         x = self.avg_pool_stage2(x) # Size: (batch_size, 8, 8, embed_dim*2)
         x = torch.cat([x, x], dim=1) # Size: (batch_size, 8, 8, embed_dim*4)
+        print("Stage 2 output shape:", x.shape)
 
         # Stage 3
+        print("Stage 3 input shape:", x.shape)
         x = self.blocks_stage3(x) # Size: (batch_size, 8, 8, embed_dim*4)
+        print("Stage 3 output shape:", x.shape)
 
         # Add CLS token
-        cls_token = torch.zeros(x.shape[0], 1, 1, 1, device=x.device) # Size: (batch_size, 1, 1, embed_dim*4)
-        x = torch.cat([cls_token, x], dim=1) # Size: (batch_size, 1, 1, embed_dim*4)
+        cls_token = torch.zeros(x.shape[0], 1, x.shape[2], x.shape[3], device=x.device) # Size: (batch_size, 8, 8, embed_dim*4)
+        print("CLS token shape:", cls_token.shape)
+        x = torch.cat([cls_token, x], dim=1)
+        print("After cls concatenation:", x.shape)
 
-        # Final transformer block and classification head
         x = self.final_block(x) # Size: (batch_size, 1, 1, embed_dim*4)
-        x = x[:, 0] # Size: (batch_size, embed_dim*4)
+        print("After final block:", x.shape)
+        x = x.mean([2, 3])  # Size: (batch_size, embed_dim*4 + 1)
+        print("After mean:", x.shape)
         x = self.cls_head(x) # Size: (batch_size, 1)
+        print("After classification head:", x.shape)
 
         return x # Size: (batch_size, 1)
