@@ -1,39 +1,52 @@
 import torch.nn as nn
 import torch
-from TransformerBlock import TransformerBlock
+import torch.nn.functional as F
+from TransformerBlock import SelfAttention
 
 class GridTransformerBlock(nn.Module):
-    def __init__(self, embed_dim, ff_dim, image_size, dropout=0.1):
+    def __init__(self, embed_dim, ff_dim, height, width, dropout=0.1):
         super(GridTransformerBlock, self).__init__()
 
-        self.num_blocks = image_size // 16
-        self.blocks = nn.ModuleList([
-            TransformerBlock(embed_dim, ff_dim, dropout)
-            for _ in range(self.num_blocks * self.num_blocks)
-        ])
+        self.height = height
+        self.width = width
+
+        self.embed_dim = embed_dim
+        self.grid_size = 16
+        self.self_attn = SelfAttention(embed_dim, height, width)
+
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(ff_dim, embed_dim),
+        )
+
+        self.ln1 = nn.LayerNorm(embed_dim)
+        self.ln2 = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
-        batch_size, height, width, embed_dim = x.shape # (batch_size, height, width, embed_dim)
-        # print("GridTransformerBlock input shape:", x.shape)
+        batch_size, seq_len, embed_dim = x.shape
 
-        # Split the input into 16x16 blocks
-        blocks = x.view(batch_size, self.num_blocks, 16, self.num_blocks, 16, embed_dim) # (batch_size, num_blocks, 16, num_blocks, 16, embed_dim)
-        # print("Blocks shape:", blocks.shape)
-        blocks = blocks.permute(0, 1, 3, 2, 4, 5).contiguous().view(batch_size, -1, embed_dim, 16, 16) # (batch_size, num_blocks * num_blocks, embed_dim, 16, 16)
-        # print("Blocks shape after permute:", blocks.shape)
+        x = x.reshape(batch_size, embed_dim, self.height, self.width) # (batch_size, embed_dim, height, width)
 
-        # Reshape blocks to (num_blocks * num_blocks, batch_size, embed_dim, 16, 16)
-        blocks = blocks.permute(1, 0, 2, 3, 4)
-        # print("Blocks shape after reshape:", blocks.shape)
+        x_processed = []
+        for h in range(0, self.height, self.grid_size):
+            for w in range(0, self.width, self.grid_size):
+                grid = x[:, :, h:h+self.grid_size, w:w+self.grid_size] # (batch_size, embed_dim, grid_size, grid_size)
+                grid = grid.reshape(batch_size, -1, embed_dim) # (batch_size, grid_size*grid_size, embed_dim)
+                grid_processed = self.self_attn(grid) # (batch_size, embed_dim, grid_size, grid_size)
+                grid_processed = grid_processed.view(batch_size, embed_dim, self.grid_size, self.grid_size)
+                x_processed.append(grid_processed)
 
-        # Apply each TransformerBlock to a different block of the input
-        blocks = torch.cat([block(blocks[i]) for i, block in enumerate(self.blocks)], dim=0) # (num_blocks * num_blocks, batch_size, embed_dim, 16, 16)
-        # print("Blocks shape after TransformerBlock:", blocks.shape)
+        # Reassemble grids back to the image
+        num_grids_h = self.height // self.grid_size
+        num_grids_w = self.width // self.grid_size
+        x = torch.cat([torch.cat(x_processed[i*num_grids_w:(i+1)*num_grids_w], dim=3) for i in range(num_grids_h)], dim=2)
+        # x: (batch_size, embed_dim, height, width)
 
-        # Combine the outputs of the TransformerBlocks
-        blocks = blocks.view(self.num_blocks, self.num_blocks, batch_size, embed_dim, 16, 16) # (num_blocks, num_blocks, batch_size, embed_dim, 16, 16)
-        # print("Blocks shape after view:", blocks.shape)
-        blocks = blocks.permute(2, 0, 3, 1, 4, 5).contiguous().view(batch_size, height, width, embed_dim) # (batch_size, height, width, embed_dim)
-        # print("Blocks shape after permute:", blocks.shape)
+        x = x.view(batch_size, -1, embed_dim) # (batch_size, seq_len, embed_dim)
 
-        return blocks
+        x = x + self.ln1(self.ffn(x)) # (batch_size, embed_dim, height, width)
+        x = x + self.ln2(x) # (batch_size, embed_dim, height, width)
+
+        return x

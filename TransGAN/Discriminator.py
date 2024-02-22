@@ -4,70 +4,86 @@ from TransformerBlock import TransformerBlock
 from GridTransformerBlock import GridTransformerBlock
 
 class Discriminator(nn.Module):
-    def __init__(self, embed_dim, ff_dim, dropout):
+    def __init__(self, embed_dim, ff_dim, dropout, patch_size=4):
         super(Discriminator, self).__init__()
         self.embed_dim = embed_dim
 
-        # Initial linear layer to map the input to the required dimensions
-        self.initial_linear = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(128*128*3, 32*32*embed_dim),
-            nn.ReLU(True)
-        )
+        self.patch_sizes = [patch_size, patch_size * 2, patch_size * 4]
+
+        self.patch_embeds = nn.ModuleList([PatchEmbedding(3, embed_dim // 4, self.patch_sizes[0]),
+                                            PatchEmbedding(3, embed_dim // 4, self.patch_sizes[1]),
+                                            PatchEmbedding(3, embed_dim // 2, self.patch_sizes[2])])
+
+        self.pos_embeds = nn.ParameterList([nn.Parameter(torch.randn(1, 32 * 32, embed_dim // 4)),
+                                            nn.Parameter(torch.randn(1, 16 * 16, embed_dim // 4)),
+                                            nn.Parameter(torch.randn(1, 8 * 8, embed_dim // 2))])
 
         # Stage 1: Transformer blocks and average pooling
-        self.blocks_stage1 = nn.Sequential(*[GridTransformerBlock(embed_dim, ff_dim, 32, dropout) for _ in range(3)])
-        self.avg_pool_stage1 = nn.AvgPool2d(2)
+        self.blocks_stage1 = nn.Sequential(*[GridTransformerBlock(embed_dim // 4, ff_dim, 32, 32, dropout) for _ in range(3)])
+        self.avg_pool_stage1 = nn.AvgPool2d(kernel_size=(4,1), stride=(4,1))
 
         # Stage 2: Transformer blocks and average pooling
-        self.blocks_stage2 = nn.Sequential(*[TransformerBlock(embed_dim*2, ff_dim, dropout) for _ in range(3)])
-        self.avg_pool_stage2 = nn.AvgPool2d(2)
+        self.blocks_stage2 = nn.Sequential(*[TransformerBlock(embed_dim // 2, ff_dim, 16, 16, dropout) for _ in range(3)])
+        self.avg_pool_stage2 = nn.AvgPool2d(kernel_size=(4,1), stride=(4,1))
 
         # Stage 3: Transformer blocks
-        self.blocks_stage3 = nn.Sequential(*[TransformerBlock(embed_dim*4, ff_dim, dropout) for _ in range(3)])
+        self.blocks_stage3 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 8, 8, dropout) for _ in range(3)])
 
         # Final transformer block and classification head
-        self.final_block = TransformerBlock(embed_dim*4 + 1, ff_dim, dropout)
-        self.cls_head = nn.Linear(embed_dim*4 + 1, 1)
+        self.final_block = TransformerBlock(embed_dim, ff_dim, 8, 8, dropout, token=True)
+
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+        self.cls_head = nn.Linear(embed_dim, 1)
 
     def forward(self, x):
-        # Initial linear layer
-        x = self.initial_linear(x) # Size: (batch_size, 32*32*embed_dim)
-        x = x.view(-1, 32, 32, self.embed_dim) # Size: (batch_size, 32, 32, embed_dim)
+        batch_size, _, _, _ = x.shape
+        # Input shape x: (batch_size, 3, 128, 128)
+
+        xs = [patch_embed(x) for patch_embed in self.patch_embeds] # List of tensors of shape (batch_size, num_patches, embed_dim)
+        # print shapes
+        # for i in range(3):
+        #     print(f'xs[{i}]: {xs[i].shape}')
+
+        xs = [xs[i] + self.pos_embeds[i] for i in range(3)] # Add positional embeddings
+
+        out = xs[0] # Size: (batch_size, 32*32, embed_dim / 4)
 
         # Stage 1
-        print("Embed_dim:", self.embed_dim)
-        print("Stage 1 input shape:", x.shape)
-        x = self.blocks_stage1(x) # Size: (batch_size, 32, 32, embed_dim)
-        print("Stage 1 block 1 shape:", x.shape)
-        x = self.avg_pool_stage1(x) # Size: (batch_size, 16, 16, embed_dim)
-        print("Stage 1 avg pool shape:", x.shape)
-        x = torch.cat([x, x], dim=1) # Size: (batch_size, 16, 16, embed_dim*2)
-        print("Stage 1 output shape:", x.shape)
+        out = self.blocks_stage1(out) # Size: (batch_size, 32*32, embed_dim / 4)
+        # print(f'out after block: {out.shape}')
+        out = self.avg_pool_stage1(out) # Size: (batch_size, 16*16, embed_dim / 4)
+        # print(f'out: {out.shape}')
+        # print(f'xs[1]: {xs[1].shape}')
+        out = torch.cat([out, xs[1]], dim=2) # Size: (batch_size, 16*16, embed_dim / 2)
 
         # Stage 2
-        print("Stage 2 input shape:", x.shape)
-        x = self.blocks_stage2(x) # Size: (batch_size, 16, 16, embed_dim*2)
-        x = self.avg_pool_stage2(x) # Size: (batch_size, 8, 8, embed_dim*2)
-        x = torch.cat([x, x], dim=1) # Size: (batch_size, 8, 8, embed_dim*4)
-        print("Stage 2 output shape:", x.shape)
+        out = self.blocks_stage2(out) # Size: (batch_size, 16*16, embed_dim / 2)
+        out = self.avg_pool_stage2(out) # Size: (batch_size, 8*8, embed_dim / 2)
+        out = torch.cat([out, xs[2]], dim=2) # Size: (batch_size, 8*8, embed_dim)
 
         # Stage 3
-        print("Stage 3 input shape:", x.shape)
-        x = self.blocks_stage3(x) # Size: (batch_size, 8, 8, embed_dim*4)
-        print("Stage 3 output shape:", x.shape)
+        out = self.blocks_stage3(out)
 
         # Add CLS token
-        cls_token = torch.zeros(x.shape[0], 1, x.shape[2], x.shape[3], device=x.device) # Size: (batch_size, 8, 8, embed_dim*4)
-        print("CLS token shape:", cls_token.shape)
-        x = torch.cat([cls_token, x], dim=1)
-        print("After cls concatenation:", x.shape)
+        cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+        out = torch.cat([cls_tokens, out], dim=1)
 
-        x = self.final_block(x) # Size: (batch_size, 1, 1, embed_dim*4)
-        print("After final block:", x.shape)
-        x = x.mean([2, 3])  # Size: (batch_size, embed_dim*4 + 1)
-        print("After mean:", x.shape)
-        x = self.cls_head(x) # Size: (batch_size, 1)
-        print("After classification head:", x.shape)
+        out = self.final_block(out)
 
-        return x # Size: (batch_size, 1)
+        out = self.cls_head(out)
+
+        return out
+
+
+
+class PatchEmbedding(nn.Module):
+    def __init__(self, in_channels, embed_dim, patch_size):
+        super().__init__()
+        self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
+
+    def forward(self, x):
+        x = self.proj(x)  # (batch_size, embed_dim, height/patch_size, width/patch_size)
+        # print(f'This x: {x.shape}')
+        x = x.flatten(2).transpose(1, 2) # (batch_size, num_patches, embed_dim)
+        # print(f'That x: {x.shape}')
+        return x

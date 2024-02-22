@@ -29,7 +29,7 @@ def main():
     dataset = CelebADataset(image_dir=image_dir, transform=transform)
 
     # Batch Size Hyperparameter
-    global_batch_size = 2
+    global_batch_size = 16
 
     # Create a data loader
     # num_gpus = torch.cuda.device_count()
@@ -55,8 +55,8 @@ def main():
     plt.close(fig)
 
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=32, ff_dim=256, dropout=0.1)
-    netD = Discriminator(embed_dim=32, ff_dim=256, dropout=0.1)
+    netG = Generator(noise_dim=100, embed_dim=1024, ff_dim=256, dropout=0.1)
+    netD = Discriminator(embed_dim=384, ff_dim=256, dropout=0.1, patch_size=4)
 
     netG = netG.to(device)
     netD = netD.to(device)
