@@ -47,7 +47,7 @@ def main():
         axes[i].axis('off')  # Turn off axes for cleaner look
 
     base = '../produced_images/SAGAN'
-    model_base = '../model_states/SAGAN'
+    model_base = '../checkpoints/SAGAN'
 
     plt.savefig(os.path.join(base, 'celeba_sample_128.png'))
     plt.close(fig)
