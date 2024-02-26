@@ -57,8 +57,8 @@ def main():
     netD = Discriminator().to(device)
 
     # Load the state dict
-    netG.load_state_dict(torch.load(os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN.pth')))
-    netD.load_state_dict(torch.load(os.path.join(model_base, 'Dis-6Layer-128x128-SAGAN.pth')))
+    netG.load_state_dict(torch.load(os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN-Big2.pth')))
+    netD.load_state_dict(torch.load(os.path.join(model_base, 'Dis-6Layer-128x128-SAGAN-Big2.pth')))
     print("Model loaded successfully!")
 
     # Hyperparameters
@@ -77,7 +77,7 @@ def main():
     batch_count = []
 
     # Training Loop
-    for epoch in range(1 + 150, num_epochs + 150 + 1):
+    for epoch in range(1 + 300, num_epochs + 300 + 1):
         for i, data in enumerate(dataloader, 0):
             # Transfer data tensor to GPU/CPU (device)
             real_data = data.to(device)
@@ -113,7 +113,7 @@ def main():
                 gen_loss.append(errG.item())
                 dis_loss.append(errD.item())
                 batch_count.append(i + dataloader_length * epoch)
-                print(f'[{epoch}/{num_epochs + 150}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
+                print(f'[{epoch}/{num_epochs + 300}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
             if epoch % 25 == 0 and i == 0:
                 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
@@ -125,8 +125,8 @@ def main():
     print("Training is complete!")
 
     # Save the trained model
-    torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN-Big2.pth'))
-    torch.save(netD.state_dict(), os.path.join(model_base, 'Dis-6Layer-128x128-SAGAN-Big2.pth'))
+    torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN-Big3.pth'))
+    torch.save(netD.state_dict(), os.path.join(model_base, 'Dis-6Layer-128x128-SAGAN-Big3.pth'))
 
     fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
     generate_images(netG, base, fixed_noise, label='Final')

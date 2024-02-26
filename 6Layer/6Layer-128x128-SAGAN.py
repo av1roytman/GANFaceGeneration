@@ -271,17 +271,17 @@ class SelfAttention(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
-        batch_size, C, width, height = x.size()
-        query = self.query_conv(x).view(batch_size, -1, width * height).permute(0, 2, 1)
-        key = self.key_conv(x).view(batch_size, -1, width * height)
-        value = self.value_conv(x).view(batch_size, -1, width * height)
+        batch_size, C, height, width = x.size()
+        query = self.query_conv(x).view(batch_size, -1, height * width).permute(0, 2, 1) # (batch_size, height * width, C)
+        key = self.key_conv(x).view(batch_size, -1, height * width) # (batch_size, C, height * width)
+        value = self.value_conv(x).view(batch_size, -1, height * width) # (batch_size, C, height * width)
 
-        attention = torch.bmm(query, key)
-        attention = self.softmax(attention)
+        attention = torch.bmm(query, key) # (batch_size, height * width, height * width)
+        attention = self.softmax(attention) # (batch_size, height * width, height * width)
 
-        out = torch.bmm(value, attention.permute(0, 2, 1))
-        out = out.view(batch_size, C, width, height)
-        out = self.out_conv(out)
+        out = torch.bmm(value, attention.permute(0, 2, 1)) # (batch_size, C, height * width)
+        out = out.view(batch_size, C, height, width) # (batch_size, C, height, width)
+        out = self.out_conv(out) # (batch_size, C, height, width)
 
         return self.gamma * out + x  # Skip connection
     

@@ -12,9 +12,14 @@ from Helpers import generate_images, generate_loss_graphs
 from torch.cuda.amp import autocast, GradScaler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
+from torch.utils.data.distributed import DistributedSampler
 
 def main():
     device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+
+    # dist.init_process_group('nccl')
+    # device = torch.device(f'cuda:{torch.distributed.get_rank()}')
 
     # Reshape data and scale to [-1, 1]
     transform = transforms.Compose([
@@ -35,6 +40,8 @@ def main():
     # num_gpus = torch.cuda.device_count()
     # print("Number of available GPUs:", num_gpus)
     dataloader = DataLoader(dataset, batch_size=global_batch_size, shuffle=True, num_workers=8)
+    # sampler = DistributedSampler(dataset)
+    # dataloader = DataLoader(dataset, sampler=sampler, batch_size=global_batch_size, shuffle=False, num_workers=8)
 
     # Create a 3x3 grid for the images
     fig, axes = plt.subplots(3, 3, figsize=(9, 9))
@@ -75,7 +82,7 @@ def main():
     # netD = DDP(netD.to(device))
 
     # Hyperparameters
-    num_epochs = 150
+    num_epochs = 15
     lr = 0.0001
     beta1 = 0
     beta2 = 0.99
@@ -135,7 +142,7 @@ def main():
                 batch_count.append(i + dataloader_length * epoch)
                 print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
-            if epoch % 25 == 0 and i == 0:
+            if epoch % 10 == 0 and i == 0:
                 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
                 generate_images(netG, base, fixed_noise, label=f'Epoch-{epoch}')
                 generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
