@@ -56,7 +56,7 @@ def main():
         axes[i].axis('off')  # Turn off axes for cleaner look
 
     base = '../produced_images/TransGAN'
-    model_base = '../model_states/TransGAN'
+    model_base = '../checkpoints/TransGAN'
 
     plt.savefig(os.path.join(base, 'celeba_sample_128.png'))
     plt.close(fig)
@@ -96,7 +96,6 @@ def main():
     dis_loss = []
     batch_count = []
 
-    scaler = GradScaler()
 
     # Training Loop
     for epoch in range(1, num_epochs + 1):
@@ -107,32 +106,27 @@ def main():
 
             # Train Discriminator
             netD.zero_grad()
-            with autocast():
-                output = netD(real_data).view(-1)
-                errD_real = torch.mean(torch.relu(1.0 - output))
+            output = netD(real_data).view(-1)
+            errD_real = torch.mean(torch.relu(1.0 - output))
 
-            scaler.scale(errD_real).backward()
+            errD_real.backward()
 
             noise = torch.randn(batch_size, 100, 1, 1, device=device)
-            with autocast():
-                fake = netG(noise)
-                output = netD(fake.detach()).view(-1)
-                errD_fake = torch.mean(torch.relu(1.0 + output))
+            fake = netG(noise)
+            output = netD(fake.detach()).view(-1)
+            errD_fake = torch.mean(torch.relu(1.0 + output))
 
-            scaler.scale(errD_fake).backward()
+            errD_fake.backward()
             errD = errD_real + errD_fake
-            scaler.step(optimizerD)
-            scaler.update()
+            optimizerD.step()
 
             # Train Generator
             netG.zero_grad()
-            with autocast():
-                output = netD(fake).view(-1)
-                errG = -torch.mean(output)
+            output = netD(fake).view(-1)
+            errG = -torch.mean(output)
 
-            scaler.scale(errG).backward()
-            scaler.step(optimizerG)
-            scaler.update()
+            errG.backward()
+            optimizerG.step()
 
             # Save Losses for plotting later
 
