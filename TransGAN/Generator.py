@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from TransformerBlock import TransformerBlock
 from GridTransformerBlock import GridTransformerBlock
+from PositionalEncoding import PositionalEncoding
 
 class Generator(nn.Module):
     def __init__(self, noise_dim, embed_dim, ff_dim, dropout):
@@ -18,7 +19,7 @@ class Generator(nn.Module):
             nn.ReLU(True)
         )
 
-        self.pos_enc = nn.Parameter(torch.randn(1, self.initial_dimension * self.initial_dimension, embed_dim))
+        self.pos_enc = PositionalEncoding(self.initial_dimension * self.initial_dimension, embed_dim)
 
         # Stage 1: Transformer blocks
         self.blocks_stage1 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 8, 8, dropout) for _ in range(5)])
@@ -49,7 +50,7 @@ class Generator(nn.Module):
         x = self.mlp(z) # size: (batch_size, 8 * 8 * embed_dim)
         x = x.view(z.shape[0], 64, self.embed_dim) # size: (batch_size, 64, embed_dim)
 
-        x = x + self.pos_enc # size: (batch_size, 64, embed_dim)
+        x = self.pos_enc(x) # size: (batch_size, 64, embed_dim)
 
         # Stage 1
         x = self.blocks_stage1(x) # size: (batch_size, 64, embed_dim)
@@ -85,12 +86,16 @@ class UpsamplingBlock(nn.Module):
         self.height = height
         self.width = width
 
-        self.reshape = nn.Unflatten(1, (height, width))
+        # self.reshape = nn.Unflatten(1, (height, width))
         self.upsample = nn.Upsample(scale_factor=2, mode='bicubic', align_corners=False)
 
     def forward(self, x):
-        x = self.reshape(x)
-        x = self.upsample(x)
+        # size: (batch_size, height * width, embed_dim)
+        x = x.view(x.shape[0], self.height, self.width, self.embed_dim) # size: (batch_size, height, width, embed_dim)
+        x = x.permute(0, 3, 1, 2) # size: (batch_size, embed_dim, height, width
+        # x = self.reshape(x)
+        x = self.upsample(x) # size: (batch_size, embed_dim, height * 2, width * 2)
+        x = x.permute(0, 2, 3, 1) # size: (batch_size, height * 2, width * 2, embed_dim)
         return x.view(x.shape[0], self.height * 2 * self.width * 2, self.embed_dim)
 
 
@@ -102,10 +107,14 @@ class UpsampleBlock_PixelShuffle(nn.Module):
         self.height = height
         self.width = width
 
-        self.reshape = nn.Unflatten(1, (height, width))
+        # self.reshape = nn.Unflatten(1, (height, width))
         self.pixel_shuffle = nn.PixelShuffle(2)
 
     def forward(self, x):
-        x = self.reshape(x)
-        x = self.pixel_shuffle(x)
-        return x.view(x.shape[0], self.height * 2 * self.width * 2, self.embed_dim // 4)
+        # size of x: (batch_size, height * width, embed_dim)
+        # x = self.reshape(x) # size: (batch_size, height, width, embed_dim)
+        x = x.view(x.shape[0], self.height, self.width, self.embed_dim) # size: (batch_size, height, width, embed_dim)
+        x = x.permute(0, 3, 1, 2) # size: (batch_size, embed_dim, height, width)
+        x = self.pixel_shuffle(x) # size: (batch_size, embed_dim // 4, height * 2, width * 2)
+        x = x.permute(0, 2, 3, 1) # size: (batch_size, height * 2, width * 2, embed_dim // 4)
+        return x.view(x.shape[0], self.height * 2 * self.width * 2, self.embed_dim // 4) # size: (batch_size, height * 2 * width * 2, embed_dim // 4)

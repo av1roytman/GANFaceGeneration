@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 from torch.nn import MultiheadAttention
+from PositionalEncoding import PositionalEncoding
 
 class TransformerBlock(nn.Module):
     def __init__(self, embed_dim, ff_dim, height, width, dropout=0.1, token=False):
@@ -47,9 +48,9 @@ class SelfAttention(nn.Module):
         # print(f'height: {height}, width: {width}')
         # print(f'embed_dim: {embed_dim}')
         if token:
-            self.positional_embeddings = nn.Parameter(torch.randn((height * width + 1, embed_dim)))
+            self.positional_embeddings = PositionalEncoding(height * width + 1, embed_dim)
         else:
-            self.positional_embeddings = nn.Parameter(torch.randn((height * width, embed_dim)))
+            self.positional_embeddings = PositionalEncoding(height * width, embed_dim)
 
     def forward(self, x):
         # print(f'x.shape: {x.shape}')
@@ -57,7 +58,7 @@ class SelfAttention(nn.Module):
 
         # print(f'positional_embeddings.shape: {self.positional_embeddings.shape}')
         # print(f'position: {self.positional_embeddings[:seq_length, :].shape}')
-        x = x + self.positional_embeddings[:seq_length, :]
+        x = self.positional_embeddings(x)
         
         Q = self.query(x)  # (batch_size, seq_length, embed_dim)
         K = self.key(x)    # (batch_size, seq_length, embed_dim)

@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 from TransformerBlock import TransformerBlock
 from GridTransformerBlock import GridTransformerBlock
+from PositionalEncoding import PositionalEncoding
 
 class Discriminator(nn.Module):
     def __init__(self, embed_dim, ff_dim, dropout, patch_size=4):
@@ -19,6 +20,10 @@ class Discriminator(nn.Module):
         self.pos_embeds = nn.ParameterList([nn.Parameter(torch.randn(1, image_size**2, embed_dim // 4)),
                                             nn.Parameter(torch.randn(1, (image_size // 2)**2, embed_dim // 4)),
                                             nn.Parameter(torch.randn(1, (image_size // 4)**2, embed_dim // 2))])
+
+        self.pos_encs = nn.ModuleList([PositionalEncoding(embed_dim // 4, image_size, image_size),
+                                        PositionalEncoding(embed_dim // 4, image_size // 2, image_size // 2),
+                                        PositionalEncoding(embed_dim // 2, image_size // 4, image_size // 4)])
 
         # Stage 1: Transformer blocks and average pooling
         self.blocks_stage1 = nn.Sequential(*[GridTransformerBlock(embed_dim // 4, ff_dim, 32, 32, dropout) for _ in range(3)])
