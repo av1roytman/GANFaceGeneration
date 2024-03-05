@@ -14,9 +14,11 @@ class Discriminator(nn.Module):
                                             PatchEmbedding(3, embed_dim // 4, self.patch_sizes[1]),
                                             PatchEmbedding(3, embed_dim // 2, self.patch_sizes[2])])
 
-        self.pos_embeds = nn.ParameterList([nn.Parameter(torch.randn(1, 32 * 32, embed_dim // 4)),
-                                            nn.Parameter(torch.randn(1, 16 * 16, embed_dim // 4)),
-                                            nn.Parameter(torch.randn(1, 8 * 8, embed_dim // 2))])
+        image_size = 128 // patch_size
+
+        self.pos_embeds = nn.ParameterList([nn.Parameter(torch.randn(1, image_size**2, embed_dim // 4)),
+                                            nn.Parameter(torch.randn(1, (image_size // 2)**2, embed_dim // 4)),
+                                            nn.Parameter(torch.randn(1, (image_size // 4)**2, embed_dim // 2))])
 
         # Stage 1: Transformer blocks and average pooling
         self.blocks_stage1 = nn.Sequential(*[GridTransformerBlock(embed_dim // 4, ff_dim, 32, 32, dropout) for _ in range(3)])
