@@ -60,17 +60,17 @@ class Discriminator(nn.Module):
         out = torch.cat([out, xs[2]], dim=2) # Size: (batch_size, 8*8, embed_dim)
 
         # Stage 3
-        out = self.blocks_stage3(out)
+        out = self.blocks_stage3(out) # Size: (batch_size, 8*8, embed_dim)
 
         # Add CLS token
-        cls_tokens = self.cls_token.expand(batch_size, -1, -1)
-        out = torch.cat([cls_tokens, out], dim=1)
+        cls_tokens = self.cls_token.expand(batch_size, -1, -1) # Size: (batch_size, 1, embed_dim)
+        out = torch.cat([cls_tokens, out], dim=1) # Size: (batch_size, 65, embed_dim)
 
-        out = self.final_block(out)
+        out = self.final_block(out) # Size: (batch_size, 65, embed_dim)
 
-        out = self.cls_head(out)
+        out = self.cls_head(out[:, 0]) # Size: (batch_size, 1)
 
-        return out
+        return out # Size: (batch_size, 1)
 
 
 
