@@ -21,9 +21,9 @@ class Discriminator(nn.Module):
                                             nn.Parameter(torch.randn(1, (image_size // 2)**2, embed_dim // 4)),
                                             nn.Parameter(torch.randn(1, (image_size // 4)**2, embed_dim // 2))])
 
-        self.pos_encs = nn.ModuleList([PositionalEncoding(embed_dim // 4, image_size, image_size),
-                                        PositionalEncoding(embed_dim // 4, image_size // 2, image_size // 2),
-                                        PositionalEncoding(embed_dim // 2, image_size // 4, image_size // 4)])
+        # self.pos_encs = nn.ModuleList([PositionalEncoding(embed_dim // 4, image_size, image_size),
+        #                                 PositionalEncoding(embed_dim // 4, image_size // 2, image_size // 2),
+        #                                 PositionalEncoding(embed_dim // 2, image_size // 4, image_size // 4)])
 
         # Stage 1: Transformer blocks and average pooling
         self.blocks_stage1 = nn.Sequential(*[GridTransformerBlock(embed_dim // 4, ff_dim, 32, 32, dropout) for _ in range(3)])

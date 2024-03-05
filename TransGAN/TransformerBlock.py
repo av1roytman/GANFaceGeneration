@@ -45,20 +45,9 @@ class SelfAttention(nn.Module):
         self.height = height
         self.width = width
 
-        # print(f'height: {height}, width: {width}')
-        # print(f'embed_dim: {embed_dim}')
-        if token:
-            self.positional_embeddings = PositionalEncoding(height * width + 1, embed_dim)
-        else:
-            self.positional_embeddings = PositionalEncoding(height * width, embed_dim)
-
     def forward(self, x):
         # print(f'x.shape: {x.shape}')
         batch_size, seq_length, embed_dim = x.shape
-
-        # print(f'positional_embeddings.shape: {self.positional_embeddings.shape}')
-        # print(f'position: {self.positional_embeddings[:seq_length, :].shape}')
-        x = self.positional_embeddings(x)
         
         Q = self.query(x)  # (batch_size, seq_length, embed_dim)
         K = self.key(x)    # (batch_size, seq_length, embed_dim)
