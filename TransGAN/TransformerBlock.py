@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+from torch.nn import MultiheadAttention
 
 class TransformerBlock(nn.Module):
     def __init__(self, embed_dim, ff_dim, height, width, dropout=0.1, token=False):

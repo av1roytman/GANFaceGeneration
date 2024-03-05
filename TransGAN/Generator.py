@@ -45,36 +45,36 @@ class Generator(nn.Module):
         self.to_rgb = nn.Conv2d(embed_dim // 64, 3, kernel_size=1)
 
     def forward(self, z):
-        z = z.view(z.shape[0], -1)
-        x = self.mlp(z)
-        x = x.view(z.shape[0], 64, self.embed_dim)
+        z = z.view(z.shape[0], -1) # size: (batch_size, noise_dim)
+        x = self.mlp(z) # size: (batch_size, 8 * 8 * embed_dim)
+        x = x.view(z.shape[0], 64, self.embed_dim) # size: (batch_size, 64, embed_dim)
 
-        x = x + self.pos_enc
+        x = x + self.pos_enc # size: (batch_size, 64, embed_dim)
 
         # Stage 1
-        x = self.blocks_stage1(x)
+        x = self.blocks_stage1(x) # size: (batch_size, 64, embed_dim)
 
         # Stage 2
-        x = self.upsample_stage2(x)
-        x = self.blocks_stage2(x)
+        x = self.upsample_stage2(x) # size: (batch_size, 128, embed_dim)
+        x = self.blocks_stage2(x) # size: (batch_size, 128, embed_dim)
 
         # Stage 3
-        x = self.pixel_shuffle_stage3(x)
-        x = self.blocks_stage3(x)
+        x = self.pixel_shuffle_stage3(x) # size: (batch_size, 128, embed_dim // 4)
+        x = self.blocks_stage3(x) # size: (batch_size, 128, embed_dim // 4)
 
         # Stage 4
-        x = self.pixel_shuffle_stage4(x)
-        x = self.blocks_stage4(x)
+        x = self.pixel_shuffle_stage4(x) # size: (batch_size, 128, embed_dim // 16)
+        x = self.blocks_stage4(x) # size: (batch_size, 128, embed_dim // 16)
 
         # Stage 5
-        x = self.pixel_shuffle_stage5(x)
-        x = self.blocks_stage5(x)
+        x = self.pixel_shuffle_stage5(x) # size: (batch_size, 128, embed_dim // 64)
+        x = self.blocks_stage5(x) # size: (batch_size, 128, embed_dim // 64)
 
         # Final linear layer
-        x = self.reshape(x)
-        x = x.permute(0, 3, 1, 2)
-        x = self.to_rgb(x)
-        return x
+        x = self.reshape(x) # size: (batch_size, 3, 128, 128)
+        x = x.permute(0, 3, 1, 2) # size: (batch_size, 128, 3, 128)
+        x = self.to_rgb(x) # size: (batch_size, 3, 128, 128)
+        return x # size: (batch_size, 3, 128, 128)
 
 
 class UpsamplingBlock(nn.Module):
