@@ -51,7 +51,6 @@ class Generator(nn.Module):
         z = z.view(z.shape[0], -1) # size: (batch_size, noise_dim)
         x = self.mlp(z) # size: (batch_size, 8 * 8 * embed_dim)
         x = x.view(z.shape[0], 64, self.embed_dim) # size: (batch_size, 64, embed_dim)
-        print(f'x.shape: {x.shape}')
 
         # Stage 1
         x = self.pos_enc_stage1(x) # size: (batch_size, 64, embed_dim)

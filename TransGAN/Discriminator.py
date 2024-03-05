@@ -17,13 +17,9 @@ class Discriminator(nn.Module):
 
         image_size = 128 // patch_size
 
-        self.pos_embeds = nn.ParameterList([nn.Parameter(torch.randn(1, image_size**2, embed_dim // 4)),
-                                            nn.Parameter(torch.randn(1, (image_size // 2)**2, embed_dim // 4)),
-                                            nn.Parameter(torch.randn(1, (image_size // 4)**2, embed_dim // 2))])
-
-        # self.pos_encs = nn.ModuleList([PositionalEncoding(embed_dim // 4, image_size, image_size),
-        #                                 PositionalEncoding(embed_dim // 4, image_size // 2, image_size // 2),
-        #                                 PositionalEncoding(embed_dim // 2, image_size // 4, image_size // 4)])
+        self.pos_encs = nn.ModuleList([PositionalEncoding(embed_dim // 4, image_size * image_size),
+                                        PositionalEncoding(embed_dim // 4, image_size // 2 * image_size // 2),
+                                        PositionalEncoding(embed_dim // 2, image_size // 4 * image_size // 4)])
 
         # Stage 1: Transformer blocks and average pooling
         self.blocks_stage1 = nn.Sequential(*[GridTransformerBlock(embed_dim // 4, ff_dim, 32, 32, dropout) for _ in range(3)])
@@ -47,20 +43,15 @@ class Discriminator(nn.Module):
         # Input shape x: (batch_size, 3, 128, 128)
 
         xs = [patch_embed(x) for patch_embed in self.patch_embeds] # List of tensors of shape (batch_size, num_patches, embed_dim)
-        # print shapes
-        # for i in range(3):
-        #     print(f'xs[{i}]: {xs[i].shape}')
 
-        xs = [xs[i] + self.pos_embeds[i] for i in range(3)] # Add positional embeddings
+        # xs = [xs[i] + self.pos_embeds[i] for i in range(3)] # Add positional embeddings
+        xs = [self.pos_encs[i](xs[i]) for i in range(3)] # Add positional embeddings
 
         out = xs[0] # Size: (batch_size, 32*32, embed_dim / 4)
 
         # Stage 1
         out = self.blocks_stage1(out) # Size: (batch_size, 32*32, embed_dim / 4)
-        # print(f'out after block: {out.shape}')
         out = self.avg_pool_stage1(out) # Size: (batch_size, 16*16, embed_dim / 4)
-        # print(f'out: {out.shape}')
-        # print(f'xs[1]: {xs[1].shape}')
         out = torch.cat([out, xs[1]], dim=2) # Size: (batch_size, 16*16, embed_dim / 2)
 
         # Stage 2
@@ -90,7 +81,5 @@ class PatchEmbedding(nn.Module):
 
     def forward(self, x):
         x = self.proj(x)  # (batch_size, embed_dim, height/patch_size, width/patch_size)
-        # print(f'This x: {x.shape}')
         x = x.flatten(2).transpose(1, 2) # (batch_size, num_patches, embed_dim)
-        # print(f'That x: {x.shape}')
         return x
