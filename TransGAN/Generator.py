@@ -156,12 +156,12 @@ class UpsampleBlock_PixelShuffle(nn.Module):
         self.height = height
         self.width = width
 
-        # self.reshape = nn.Unflatten(1, (height, width))
         self.pixel_shuffle = nn.PixelShuffle(2)
 
     def forward(self, x):
         # size of x: (batch_size, height * width, embed_dim)
-        # x = self.reshape(x) # size: (batch_size, height, width, embed_dim)
+        assert x.shape == (x.shape[0], self.height * self.width, self.embed_dim)
+
         x = x.view(x.shape[0], self.height, self.width, self.embed_dim) # size: (batch_size, height, width, embed_dim)
         assert x.shape == (x.shape[0], self.height, self.width, self.embed_dim)
 
