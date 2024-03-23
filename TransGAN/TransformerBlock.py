@@ -25,24 +25,31 @@ class TransformerBlock(nn.Module):
     def forward(self, x):
         # Input shape x: (batch_size, seq_len, embed_dim)
         batch_size, seq_len, embed_dim = x.shape
+        assert x.shape == (batch_size, seq_len, embed_dim)
 
         # Layer normalization
         x_norm = self.ln1(x)
+        assert x_norm.shape == (batch_size, seq_len, embed_dim)
 
         # Self-attention
         attn_output = self.mhsa(x_norm)
+        assert attn_output.shape == (batch_size, seq_len, embed_dim)
 
         # Residual connection and layer normalization
         x = x + attn_output
+        assert x.shape == (batch_size, seq_len, embed_dim)
 
         # Layer normalization 2
         x_norm = self.ln2(x)
+        assert x_norm.shape == (batch_size, seq_len, embed_dim)
 
         # Feed-Forward Network
         ffn_output = self.ffn(x_norm)
+        assert ffn_output.shape == (batch_size, seq_len, embed_dim)
 
         # Residual connection
         x = x + ffn_output
+        assert x.shape == (batch_size, seq_len, embed_dim)
 
         return x  # (batch_size, seq_len, embed_dim)
 
@@ -52,8 +59,18 @@ class SelfAttention(nn.Module):
         self.mhsa = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
 
     def forward(self, x):
-        # size of x: (seq_len, batch_size, embed_dim)
-        x = x.transpose(0, 1) # size: (batch_size, seq_len, embed_dim)
-        attn_output, _ = self.mhsa(x, x, x) # size: (batch_size, seq_len, embed_dim)
-        return attn_output.transpose(0, 1) # size: (seq_len, batch_size, embed_dim)
+        # size of x: (batch_size, seq_len, embed_dim)
+        batch_size, seq_len, embed_dim = x.shape
+        assert x.shape == (batch_size, seq_len, embed_dim)
+
+        x = x.transpose(0, 1) # size: (seq_len, batch_size, embed_dim)
+        assert x.shape == (seq_len, batch_size, embed_dim)
+
+        attn_output, _ = self.mhsa(x, x, x) # size: (seq_len, batch_size, embed_dim)
+        assert attn_output.shape == (seq_len, batch_size, embed_dim)
+        
+        attn_output = attn_output.transpose(0, 1) # size: (batch_size, seq_len, embed_dim)
+        assert attn_output.shape == (batch_size, seq_len, embed_dim)
+
+        return attn_output
 
