@@ -131,11 +131,20 @@ class UpsamplingBlock(nn.Module):
 
     def forward(self, x):
         # size: (batch_size, height * width, embed_dim)
+        assert x.shape == (x.shape[0], self.height * self.width, self.embed_dim)
+
         x = x.view(x.shape[0], self.height, self.width, self.embed_dim) # size: (batch_size, height, width, embed_dim)
+        assert x.shape == (x.shape[0], self.height, self.width, self.embed_dim)
+
         x = x.permute(0, 3, 1, 2) # size: (batch_size, embed_dim, height, width
-        # x = self.reshape(x)
+        assert x.shape == (x.shape[0], self.embed_dim, self.height, self.width)
+
         x = self.upsample(x) # size: (batch_size, embed_dim, height * 2, width * 2)
+        assert x.shape == (x.shape[0], self.embed_dim, self.height * 2, self.width * 2)
+
         x = x.permute(0, 2, 3, 1) # size: (batch_size, height * 2, width * 2, embed_dim)
+        assert x.shape == (x.shape[0], self.height * 2, self.width * 2, self.embed_dim)
+
         return x.view(x.shape[0], self.height * 2 * self.width * 2, self.embed_dim)
 
 
@@ -154,7 +163,15 @@ class UpsampleBlock_PixelShuffle(nn.Module):
         # size of x: (batch_size, height * width, embed_dim)
         # x = self.reshape(x) # size: (batch_size, height, width, embed_dim)
         x = x.view(x.shape[0], self.height, self.width, self.embed_dim) # size: (batch_size, height, width, embed_dim)
+        assert x.shape == (x.shape[0], self.height, self.width, self.embed_dim)
+
         x = x.permute(0, 3, 1, 2) # size: (batch_size, embed_dim, height, width)
+        assert x.shape == (x.shape[0], self.embed_dim, self.height, self.width)
+        
         x = self.pixel_shuffle(x) # size: (batch_size, embed_dim // 4, height * 2, width * 2)
+        assert x.shape == (x.shape[0], self.embed_dim // 4, self.height * 2, self.width * 2)
+
         x = x.permute(0, 2, 3, 1) # size: (batch_size, height * 2, width * 2, embed_dim // 4)
+        assert x.shape == (x.shape[0], self.height * 2, self.width * 2, self.embed_dim // 4)
+
         return x.view(x.shape[0], self.height * 2 * self.width * 2, self.embed_dim // 4) # size: (batch_size, height * 2 * width * 2, embed_dim // 4)
