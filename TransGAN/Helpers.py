@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-def generate_images(netG, base, fixed_noise, label=""):
+def generate_images(netG, base, fixed_noise, label1="", label2=""):
     # After training, use the generator to produce images from the fixed noise vectors
     netG.eval()
     with torch.no_grad():
@@ -20,13 +20,13 @@ def generate_images(netG, base, fixed_noise, label=""):
         axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
         axes[i].axis('off')  # Turn off axes for cleaner look
 
-    plt.savefig(os.path.join(base, f'6Layer-128x128-SAGAN-{label}.png'))
+    plt.savefig(os.path.join(base, f'6Layer-128x128-{label1}-{label2}.png'))
     plt.close(fig)
 
     # return netG to training mode
     netG.train()
 
-def generate_loss_graphs(gen_loss, dis_loss, batch_count, base):
+def generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1=""):
     # Graph the Loss
     plt.figure(figsize=(10, 5))
     plt.title("Generator and Discriminator Loss During Training")
@@ -35,5 +35,5 @@ def generate_loss_graphs(gen_loss, dis_loss, batch_count, base):
     plt.xlabel("Batch Count")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig(os.path.join(base, f'Loss_6Layer-128x128-SAGAN.png'))
+    plt.savefig(os.path.join(base, f'Loss_6Layer-128x128-{label1}.png'))
     plt.close()

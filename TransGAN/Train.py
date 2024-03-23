@@ -87,8 +87,8 @@ def main():
     beta1 = 0
     beta2 = 0.99
 
-    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, beta2))
-    optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, beta2))
+    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr * 0.1, betas=(beta1, beta2))
+    optimizerG = torch.optim.Adam(netG.parameters(), lr=lr * 100, betas=(beta1, beta2))
 
     dataloader_length = len(dataloader)
 
@@ -138,8 +138,8 @@ def main():
 
             if epoch % 10 == 0 and i == 0:
                 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
-                generate_images(netG, base, fixed_noise, label=f'Epoch-{epoch}')
-                generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
+                generate_images(netG, base, fixed_noise, label1='TransGAN', label2=f'Epoch-{epoch}')
+                # generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1='TransGAN')
                 torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-TransGAN.pth'))
                 torch.save(netD.state_dict(), os.path.join(model_base, 'Dis-6Layer-128x128-TransGAN.pth'))
 

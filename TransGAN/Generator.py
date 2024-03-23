@@ -10,6 +10,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
 
         self.embed_dim = embed_dim
+        self.noise_dim = noise_dim
 
         self.initial_dimension = 8
 
@@ -49,37 +50,71 @@ class Generator(nn.Module):
 
     def forward(self, z):
         z = z.view(z.shape[0], -1) # size: (batch_size, noise_dim)
+        assert z.shape == (z.shape[0], self.noise_dim)
+
         x = self.mlp(z) # size: (batch_size, 8 * 8 * embed_dim)
+        assert x.shape == (z.shape[0], 8 * 8 * self.embed_dim)
+
         x = x.view(z.shape[0], 64, self.embed_dim) # size: (batch_size, 64, embed_dim)
+        assert x.shape == (z.shape[0], 64, self.embed_dim)
 
         # Stage 1
         x = self.pos_enc_stage1(x) # size: (batch_size, 64, embed_dim)
+        assert x.shape == (z.shape[0], 64, self.embed_dim)
+
         x = self.blocks_stage1(x) # size: (batch_size, 64, embed_dim)
+        assert x.shape == (z.shape[0], 64, self.embed_dim)
 
         # Stage 2
         x = self.upsample_stage2(x) # size: (batch_size, 256, embed_dim)
+        assert x.shape == (z.shape[0], 256, self.embed_dim)
+
         x = self.pos_enc_stage2(x) # size: (batch_size, 256, embed_dim)
+        assert x.shape == (z.shape[0], 256, self.embed_dim)
+
         x = self.blocks_stage2(x) # size: (batch_size, 256, embed_dim)
+        assert x.shape == (z.shape[0], 256, self.embed_dim)
 
         # Stage 3
         x = self.pixel_shuffle_stage3(x) # size: (batch_size, 1024, embed_dim // 4)
+        assert x.shape == (z.shape[0], 1024, self.embed_dim // 4)
+
         x = self.pos_enc_stage3(x) # size: (batch_size, 1024, embed_dim // 4)
+        assert x.shape == (z.shape[0], 1024, self.embed_dim // 4)
+
         x = self.blocks_stage3(x) # size: (batch_size, 1024, embed_dim // 4)
+        assert x.shape == (z.shape[0], 1024, self.embed_dim // 4)
 
         # Stage 4
         x = self.pixel_shuffle_stage4(x) # size: (batch_size, 4096, embed_dim // 16)
+        assert x.shape == (z.shape[0], 4096, self.embed_dim // 16)
+
         x = self.pos_enc_stage4(x) # size: (batch_size, 4096, embed_dim // 16)
+        assert x.shape == (z.shape[0], 4096, self.embed_dim // 16)
+
         x = self.blocks_stage4(x) # size: (batch_size, 4096, embed_dim // 16)
+        assert x.shape == (z.shape[0], 4096, self.embed_dim // 16)
 
         # Stage 5
         x = self.pixel_shuffle_stage5(x) # size: (batch_size, 16384, embed_dim // 64)
+        assert x.shape == (z.shape[0], 16384, self.embed_dim // 64)
+
         x = self.pos_enc_stage5(x) # size: (batch_size, 16384, embed_dim // 64)
+        assert x.shape == (z.shape[0], 16384, self.embed_dim // 64)
+
         x = self.blocks_stage5(x) # size: (batch_size, 16384, embed_dim // 64)
+        assert x.shape == (z.shape[0], 16384, self.embed_dim // 64)
 
         # Final linear layer
         x = x.view(x.shape[0], 128, 128, self.embed_dim // 64) # size: (batch_size, 128, 128, embed_dim // 64)
+        assert x.shape == (z.shape[0], 128, 128, self.embed_dim // 64)
+
         x = x.permute(0, 3, 1, 2) # size: (batch_size, embed_dim // 64, 128, 128)
+        assert x.shape == (z.shape[0], self.embed_dim // 64, 128, 128)
+
         x = self.to_rgb(x) # size: (batch_size, 3, 128, 128)
+        assert x.shape == (z.shape[0], 3, 128, 128)
+
         return x # size: (batch_size, 3, 128, 128)
 
 
