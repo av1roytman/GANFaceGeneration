@@ -16,7 +16,7 @@ import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
 def main():
-    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # dist.init_process_group('nccl')
     # device = torch.device(f'cuda:{torch.distributed.get_rank()}')
@@ -83,12 +83,12 @@ def main():
 
     # Hyperparameters
     num_epochs = 15
-    lr = 0.0001
-    beta1 = 0
+    lr = 0.001
+    beta1 = 0.5
     beta2 = 0.99
 
-    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr * 0.1, betas=(beta1, beta2))
-    optimizerG = torch.optim.Adam(netG.parameters(), lr=lr * 100, betas=(beta1, beta2))
+    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, beta2))
+    optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, beta2))
 
     dataloader_length = len(dataloader)
 
@@ -106,15 +106,15 @@ def main():
 
             # Train Discriminator
             netD.zero_grad()
-            output = netD(real_data).view(-1)
-            errD_real = torch.mean(torch.relu(1.0 - output))
+            real_output = netD(real_data).view(-1)
+            errD_real = torch.mean(torch.relu(1.0 - real_output))
 
             errD_real.backward()
 
             noise = torch.randn(batch_size, 100, 1, 1, device=device)
             fake = netG(noise)
-            output = netD(fake.detach()).view(-1)
-            errD_fake = torch.mean(torch.relu(1.0 + output))
+            fake_output = netD(fake.detach()).view(-1)
+            errD_fake = torch.mean(torch.relu(1.0 + fake_output))
 
             errD_fake.backward()
             errD = errD_real + errD_fake
@@ -136,12 +136,28 @@ def main():
                 batch_count.append(i + dataloader_length * epoch)
                 print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
+                # Print images and their labels from the discriminator
+                real_data = real_data.cpu().numpy().transpose((0, 2, 3, 1))
+                fake = fake.detach().cpu().numpy().transpose((0, 2, 3, 1))
+
+                fig, axs = plt.subplots(2, batch_size, figsize=(batch_size * 2, 4))
+
+                for j in range(batch_size):
+                    axs[0, j].imshow((real_data[j] * 0.5) + 0.5)
+                    axs[0, j].set_title(f'Real: {real_output[j].item():.2f}')
+                    axs[0, j].axis('off')
+
+                    axs[1, j].imshow((fake[j] * 0.5) + 0.5)
+                    axs[1, j].set_title(f'Fake: {fake_output[j].item():.2f}')
+                    axs[1, j].axis('off')
+
+                plt.savefig(os.path.join(base, f'Samples/epoch_{epoch}_batch_{i}.png'))
+
             if epoch % 10 == 0 and i == 0:
                 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
                 generate_images(netG, base, fixed_noise, label1='TransGAN', label2=f'Epoch-{epoch}')
-                # generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1='TransGAN')
-                torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-TransGAN.pth'))
-                torch.save(netD.state_dict(), os.path.join(model_base, 'Dis-6Layer-128x128-TransGAN.pth'))
+                torch.save(netG.state_dict(), os.path.join(model_base, f'Gen-6Layer-128x128-TransGAN-{epoch}.pth'))
+                torch.save(netD.state_dict(), os.path.join(model_base, f'Dis-6Layer-128x128-TransGAN-{epoch}.pth'))
 
     print("Training is complete!")
 
