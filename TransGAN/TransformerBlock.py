@@ -8,8 +8,7 @@ class TransformerBlock(nn.Module):
     def __init__(self, embed_dim, ff_dim, height, width, dropout=0.1, token=False):
         super(TransformerBlock, self).__init__()
 
-        # self.self_attn = SelfAttention(embed_dim, height, width, token=token)
-        self.mhsa = SelfAttention(embed_dim, 8, dropout=dropout)
+        self.mhsa = nn.MultiheadAttention(embed_dim, num_heads=8, dropout=dropout, batch_first=True)
 
         # Feed Forward Network
         self.ffn = nn.Sequential(
@@ -25,31 +24,24 @@ class TransformerBlock(nn.Module):
     def forward(self, x):
         # Input shape x: (batch_size, seq_len, embed_dim)
         batch_size, seq_len, embed_dim = x.shape
-        assert x.shape == (batch_size, seq_len, embed_dim)
-
-        # Layer normalization
-        x_norm = self.ln1(x)
-        assert x_norm.shape == (batch_size, seq_len, embed_dim)
 
         # Self-attention
-        attn_output, _ = self.mhsa(x_norm)
-        assert attn_output.shape == (batch_size, seq_len, embed_dim)
+        attn_output, _ = self.mhsa(x, x, x) # (batch_size, seq_len, embed_dim)
 
         # Residual connection and layer normalization
-        x = x + attn_output
-        assert x.shape == (batch_size, seq_len, embed_dim)
+        x = x + attn_output # (batch_size, seq_len, embed_dim)
 
-        # Layer normalization 2
-        x_norm = self.ln2(x)
-        assert x_norm.shape == (batch_size, seq_len, embed_dim)
+        # Layer normalization
+        x = self.ln1(x) # (batch_size, seq_len, embed_dim)
 
         # Feed-Forward Network
-        ffn_output = self.ffn(x_norm)
-        assert ffn_output.shape == (batch_size, seq_len, embed_dim)
+        ffn_output = self.ffn(x) # (batch_size, seq_len, embed_dim)
 
         # Residual connection
-        x = x + ffn_output
-        assert x.shape == (batch_size, seq_len, embed_dim)
+        x = x + ffn_output # (batch_size, seq_len, embed_dim)
+
+        # Layer normalization 2
+        x = self.ln2(x) # (batch_size, seq_len, embed_dim)
 
         return x  # (batch_size, seq_len, embed_dim)
 

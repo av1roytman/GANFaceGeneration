@@ -156,11 +156,14 @@ def main():
     dis_loss = []
     batch_count = []
 
+    real_label = 1
+    fake_label = 0
+
+    criterion = nn.BCEWithLogitsLoss()
 
     # Training Loop
     for epoch in range(1, num_epochs + 1):
         for i, (images, labels) in enumerate(dataloader, 0):
-            # Transfer data tensor to GPU/CPU (device)
             real_data = images.to(device)
             batch_size = real_data.size(0)
 
@@ -213,6 +216,7 @@ def main():
 
                 # print("I'm here")
                 plt.savefig(os.path.join(base, f'Samples/epoch_{epoch}_batch_{i}.png'))
+                plt.close(fig)
 
             if epoch % 10 == 0 and i == 0:
                 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
