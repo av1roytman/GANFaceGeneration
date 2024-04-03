@@ -223,6 +223,7 @@ def main():
     print("Training is complete!")
 
     # Save the trained model
+
     torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-TransGAN-MNIST.pth'))
 
     fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
