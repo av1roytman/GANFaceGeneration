@@ -32,7 +32,7 @@ class TransformerBlock(nn.Module):
         assert x_norm.shape == (batch_size, seq_len, embed_dim)
 
         # Self-attention
-        attn_output = self.mhsa(x_norm)
+        attn_output, _ = self.mhsa(x_norm)
         assert attn_output.shape == (batch_size, seq_len, embed_dim)
 
         # Residual connection and layer normalization
@@ -66,11 +66,11 @@ class SelfAttention(nn.Module):
         x = x.transpose(0, 1) # size: (seq_len, batch_size, embed_dim)
         assert x.shape == (seq_len, batch_size, embed_dim)
 
-        attn_output, _ = self.mhsa(x, x, x) # size: (seq_len, batch_size, embed_dim)
+        attn_output, attention = self.mhsa(x, x, x) # size: (seq_len, batch_size, embed_dim)
         assert attn_output.shape == (seq_len, batch_size, embed_dim)
         
         attn_output = attn_output.transpose(0, 1) # size: (batch_size, seq_len, embed_dim)
         assert attn_output.shape == (batch_size, seq_len, embed_dim)
 
-        return attn_output
+        return attn_output, attention
 
