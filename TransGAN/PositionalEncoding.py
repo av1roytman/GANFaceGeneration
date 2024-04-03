@@ -19,4 +19,4 @@ class PositionalEncoding(nn.Module):
         assert x.shape == (x.shape[0], x.shape[1], self.pe.shape[2])
         x = x + self.pe[:x.size(1), :]
         assert x.shape == (x.shape[0], x.shape[1], self.pe.shape[2])
-        return x
+        return x # size: (batch_size, seq_len, d_model)

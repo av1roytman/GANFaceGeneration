@@ -4,6 +4,8 @@ import torch.nn as nn
 from Generator import UpsamplingBlock, UpsampleBlock_PixelShuffle
 from TransformerBlock import SelfAttention
 from PositionalEncoding import PositionalEncoding
+from GridTransformerBlock import GridSelfAttention
+from TransformerBlock import TransformerBlock
 
 class TestUpsamplingBlock(unittest.TestCase):
     def setUp(self):
@@ -72,6 +74,40 @@ class TestPositionalEncoding(unittest.TestCase):
         position_encodings = output_tensor - self.input_tensor
         unique_position_encodings = torch.unique(position_encodings, dim=1)
         self.assertEqual(unique_position_encodings.size(1), self.seq_length)
+
+class TestGridSelfAttention(unittest.TestCase):
+    def setUp(self):
+        # Define dimensions
+        self.embed_dim = 64
+        self.num_heads = 4
+        self.height = 32
+        self.width = 32
+        self.batch_size = 2
+
+        self.model = GridSelfAttention(embed_dim=self.embed_dim, num_heads=self.num_heads, height=self.height, width=self.width, dropout=0)
+        
+        self.input_tensor = torch.randn(self.batch_size, self.height * self.width, self.embed_dim)
+
+    def test_output_shape(self):
+        output_tensor = self.model(self.input_tensor)
+        
+        self.assertEqual(output_tensor.shape, self.input_tensor.shape)
+
+class TestTransformerBlock(unittest.TestCase):
+    def setUp(self):
+        self.embed_dim = 64
+        self.num_heads = 4
+        self.seq_length = 16
+        self.batch_size = 2
+
+        self.model = TransformerBlock(embed_dim=self.embed_dim, ff_dim=128, height=4, width=4)
+        
+        self.input_tensor = torch.randn(self.batch_size, self.seq_length, self.embed_dim)
+
+    def test_output_shape(self):
+        output_tensor = self.model(self.input_tensor)
+        
+        self.assertEqual(output_tensor.shape, self.input_tensor.shape)
 
 
 if __name__ == '__main__':
