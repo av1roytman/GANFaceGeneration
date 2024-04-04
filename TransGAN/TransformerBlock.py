@@ -5,7 +5,7 @@ from torch.nn import MultiheadAttention
 from PositionalEncoding import PositionalEncoding
 
 class TransformerBlock(nn.Module):
-    def __init__(self, embed_dim, ff_dim, height, width, dropout=0.1, token=False):
+    def __init__(self, embed_dim, ff_dim, dropout=0.1):
         super(TransformerBlock, self).__init__()
 
         self.mhsa = nn.MultiheadAttention(embed_dim, num_heads=8, dropout=dropout, batch_first=True)
@@ -14,8 +14,8 @@ class TransformerBlock(nn.Module):
         self.ffn = nn.Sequential(
             nn.Linear(embed_dim, ff_dim),
             nn.GELU(),
-            nn.Dropout(dropout),
             nn.Linear(ff_dim, embed_dim),
+            nn.Dropout(dropout),
         )
 
         self.ln1 = nn.LayerNorm(embed_dim)
@@ -25,23 +25,20 @@ class TransformerBlock(nn.Module):
         # Input shape x: (batch_size, seq_len, embed_dim)
         batch_size, seq_len, embed_dim = x.shape
 
-        # Self-attention
-        attn_output, _ = self.mhsa(x, x, x) # (batch_size, seq_len, embed_dim)
-
-        # Residual connection and layer normalization
-        x = x + attn_output # (batch_size, seq_len, embed_dim)
-
         # Layer normalization
-        x = self.ln1(x) # (batch_size, seq_len, embed_dim)
+        x1 = self.ln1(x) # (batch_size, seq_len, embed_dim)
 
-        # Feed-Forward Network
-        ffn_output = self.ffn(x) # (batch_size, seq_len, embed_dim)
+        # Self-attention
+        x1, _ = self.mhsa(x1, x1, x1) # (batch_size, seq_len, embed_dim)
 
         # Residual connection
-        x = x + ffn_output # (batch_size, seq_len, embed_dim)
+        x = x + x1 # (batch_size, seq_len, embed_dim)
 
-        # Layer normalization 2
-        x = self.ln2(x) # (batch_size, seq_len, embed_dim)
+        # Layer normalization
+        x2 = self.ln2(x) # (batch_size, seq_len, embed_dim)
+
+        # Feed-Forward Network + Residual
+        x = x + self.ffn(x2) # (batch_size, seq_len, embed_dim)
 
         return x  # (batch_size, seq_len, embed_dim)
 

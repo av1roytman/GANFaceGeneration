@@ -22,43 +22,48 @@ class Generator(nn.Module):
             nn.ReLU(True)
         )
 
-        self.pos_enc = PositionalEncoding(embed_dim, 7 * 7)
-        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 7, 7, dropout) for _ in range(1)])
+        self.pos_emb = nn.Parameter(torch.randn(1, 7 * 7, embed_dim))
+        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, dropout) for _ in range(3)])
         self.upsample1 = nn.Upsample(scale_factor=2, mode='bicubic')  # First upsampling from 7x7 to 14x14
 
-        self.pos_enc2 = PositionalEncoding(embed_dim, 14 * 14)
-        self.blocks2 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 14, 14, dropout) for _ in range(1)])
+        self.pos_emb2 = nn.Parameter(torch.randn(1, 14 * 14, embed_dim))
+        self.blocks2 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, dropout) for _ in range(3)])
         self.upsample2 = nn.PixelShuffle(2)  # Second upsampling from 14x14 to 28x28
 
-        self.pos_enc3 = PositionalEncoding(embed_dim // 4, 28 * 28)
-        self.blocks3 = nn.Sequential(*[TransformerBlock(embed_dim // 4, ff_dim, 28, 28, dropout) for _ in range(1)])
+        self.pos_emb3 = nn.Parameter(torch.randn(1, 28 * 28, embed_dim // 4))
+        self.blocks3 = nn.Sequential(*[TransformerBlock(embed_dim // 4, ff_dim, dropout) for _ in range(3)])
 
         self.to_gray = nn.Conv2d(embed_dim // 4, 1, kernel_size=1)  # Ensure this matches the channel size after upsampling
 
     def forward(self, z):
-        z = z.view(z.shape[0], -1)
-        x = self.mlp(z)
-        x = x.view(z.shape[0], 7 * 7, self.embed_dim)
-        x = self.pos_enc(x)
-        x = self.blocks(x)
+        z = z.view(z.shape[0], -1) # size: (batch_size, noise_dim)
+        x = self.mlp(z) # size: (batch_size, 7 * 7 * embed_dim)
+        x = x.view(z.shape[0], 7 * 7, self.embed_dim) # size: (batch_size, 7 * 7, embed_dim)
+        x = x + self.pos_emb # size: (batch_size, 7 * 7, embed_dim)
+        x = self.blocks(x) # size: (batch_size, 7 * 7, embed_dim)
+        x = x.transpose(1, 2) # size: (batch_size, embed_dim, 7 * 7)
         x = x.view(x.shape[0], self.embed_dim, 7, 7)
         x = self.upsample1(x)  # Upsample to 14x14
         # size: (batch_size, embed_dim, 14, 14)
 
-        x = x.view(x.shape[0], 14 * 14, self.embed_dim)
-        x = self.pos_enc2(x)
-        x = self.blocks2(x)
-        x = x.view(x.shape[0], self.embed_dim, 14, 14)
+        x = x.permute(0, 2, 3, 1)  # size: (batch_size, 14, 14, embed_dim)
+        x = x.view(x.shape[0], 14 * 14, self.embed_dim) # size: (batch_size, 14 * 14, embed_dim)
+        x = x + self.pos_emb2 # size: (batch_size, 14 * 14, embed_dim)
+        x = self.blocks2(x) # size: (batch_size, 14 * 14, embed_dim)
+        x = x.transpose(1, 2) # size: (batch_size, embed_dim, 14 * 14)
+        x = x.view(x.shape[0], self.embed_dim, 14, 14) # size: (batch_size, embed_dim, 14, 14)
         x = self.upsample2(x)  # Upsample to 28x28
         # size: (batch_size, embed_dim, 28, 28)
 
-        x = x.view(x.shape[0], 28 * 28, self.embed_dim // 4)
-        x = self.pos_enc3(x)
-        x = self.blocks3(x)
-        x = x.view(x.shape[0], self.embed_dim // 4, 28, 28)
+        x = x.permute(0, 2, 3, 1)  # size: (batch_size, 28, 28, embed_dim)
+        x = x.view(x.shape[0], 28 * 28, self.embed_dim // 4) # size: (batch_size, 28 * 28, embed_dim // 4)
+        x = x + self.pos_emb3 # size: (batch_size, 28 * 28, embed_dim // 4)
+        x = self.blocks3(x) # size: (batch_size, 28 * 28, embed_dim // 4)
+        x = x.transpose(1, 2) # size: (batch_size, embed_dim // 4, 28 * 28)
+        x = x.view(x.shape[0], self.embed_dim // 4, 28, 28) 
         # size: (batch_size, embed_dim, 28, 28)
 
-        x = self.to_gray(x)  # Convert to grayscale
+        x = self.to_gray(x)  # Convert to grayscale size: (batch_size, 1, 28, 28)
         return x
 
 
@@ -68,50 +73,46 @@ class Discriminator(nn.Module):
 
         self.embed_dim = embed_dim
 
-        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 28, 28, dropout) for _ in range(1)])
-        self.from_gray = nn.Conv2d(1, embed_dim, kernel_size=1)  # Ensure this matches the channel size after upsampling
+        self.from_gray = PatchEmbedding(1, embed_dim, 4)
+        
+        self.pos_emb = nn.Parameter(torch.randn(1, (28 // 4) ** 2 + 1, embed_dim))
 
-        self.pos_enc2 = PositionalEncoding(embed_dim, 28 * 28)
-        self.blocks2 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 28, 28, dropout) for _ in range(1)])
-        self.downsample1 = nn.AvgPool2d(kernel_size=2)  # First downsampling from 28x28 to 14x14
+        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, dropout) for _ in range(4)])
 
-        self.pos_enc3 = PositionalEncoding(embed_dim, 14 * 14)
-        self.blocks3 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 14, 14, dropout) for _ in range(1)]
-                                    + [nn.LayerNorm(embed_dim)])
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
 
-        self.downsample2 = nn.AvgPool2d(kernel_size=2)  # Second downsampling from 14x14 to 7x7
-
-        self.pos_enc4 = PositionalEncoding(embed_dim, 7 * 7)
-        self.blocks4 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, 7, 7, dropout) for _ in range(1)]
-                                    + [nn.LayerNorm(embed_dim)])
-
-        self.to_prob = nn.Linear(7 * 7 * embed_dim, 1)
+        self.cls_head = nn.Linear(embed_dim, 1)
 
     def forward(self, x):
-        x = self.from_gray(x)  # Convert to grayscale
-        x = x.view(x.shape[0], 28 * 28, self.embed_dim)
-        x = self.blocks(x)
-        x = x.view(x.shape[0], 28 * 28, self.embed_dim)
-        x = self.pos_enc2(x)
-        x = self.blocks2(x)
-        x = x.view(x.shape[0], self.embed_dim, 28, 28)
-        x = self.downsample1(x)  # Downsample to 14x14
-        # size: (batch_size, embed_dim, 14, 14)
+        x = self.from_gray(x)  # Convert to grayscale size: (batch_size, embed_dim, 28, 28)
+        x = x.view(x.shape[0], (28 // 4) ** 2, self.embed_dim) # size: (batch_size, 28 * 28, embed_dim)
 
-        x = x.view(x.shape[0], 14 * 14, self.embed_dim)
-        x = self.pos_enc3(x)
-        x = self.blocks3(x)
-        x = x.view(x.shape[0], self.embed_dim, 14, 14)
-        x = self.downsample2(x)
-        # size: (batch_size, embed_dim, 7, 7)
+        # Concat CLS Token
+        cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
 
-        x = x.view(x.shape[0], 7 * 7, self.embed_dim)
-        x = self.pos_enc4(x)
-        x = self.blocks4(x)
-        x = x.view(x.shape[0], -1)
-        x = self.to_prob(x)
+        x += self.pos_emb  # size: (batch_size, num_patches + 1, embed_dim)
+
+        x = self.blocks(x)  # size: (batch_size, num_patches + 1, embed_dim)
+
+        cls_representation = x[:, 0]  # CLS Token
+
+        x = self.cls_head(cls_representation) # size: (batch_size, 1)
 
         return x
+
+
+class PatchEmbedding(nn.Module):
+    def __init__(self, in_channels, embed_dim, patch_size):
+        super(PatchEmbedding, self).__init__()
+
+        self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
+
+    def forward(self, x):
+        x = self.proj(x)  # size: (batch_size, embed_dim, grid_size, grid_size)
+        x = x.flatten(2)  # size: (batch_size, embed_dim, num_patches)
+        x = x.transpose(1, 2)  # size: (batch_size, num_patches, embed_dim)
+        return x # size: (batch_size, num_patches, embed_dim)
     
 
 def main():
@@ -144,7 +145,7 @@ def main():
     # Hyperparameters
     num_epochs = 10
     lr = 0.001
-    beta1 = 0.5
+    beta1 = 0
     beta2 = 0.99
 
     optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, beta2))
