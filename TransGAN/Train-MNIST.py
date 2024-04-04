@@ -33,7 +33,9 @@ class Generator(nn.Module):
         self.pos_emb3 = nn.Parameter(torch.randn(1, 28 * 28, embed_dim // 4))
         self.blocks3 = nn.Sequential(*[TransformerBlock(embed_dim // 4, ff_dim, dropout) for _ in range(3)])
 
-        self.to_gray = nn.Conv2d(embed_dim // 4, 1, kernel_size=1)  # Ensure this matches the channel size after upsampling
+        self.to_gray = nn.Conv2d(embed_dim // 4, 1, kernel_size=1)
+
+        self.tanh = nn.Tanh()
 
     def forward(self, z):
         z = z.view(z.shape[0], -1) # size: (batch_size, noise_dim)
@@ -53,9 +55,9 @@ class Generator(nn.Module):
         x = x.transpose(1, 2) # size: (batch_size, embed_dim, 14 * 14)
         x = x.view(x.shape[0], self.embed_dim, 14, 14) # size: (batch_size, embed_dim, 14, 14)
         x = self.upsample2(x)  # Upsample to 28x28
-        # size: (batch_size, embed_dim, 28, 28)
+        # size: (batch_size, embed_dim // 4, 28, 28)
 
-        x = x.permute(0, 2, 3, 1)  # size: (batch_size, 28, 28, embed_dim)
+        x = x.permute(0, 2, 3, 1)  # size: (batch_size, 28, 28, embed_dim // 4)
         x = x.view(x.shape[0], 28 * 28, self.embed_dim // 4) # size: (batch_size, 28 * 28, embed_dim // 4)
         x = x + self.pos_emb3 # size: (batch_size, 28 * 28, embed_dim // 4)
         x = self.blocks3(x) # size: (batch_size, 28 * 28, embed_dim // 4)
@@ -64,6 +66,9 @@ class Generator(nn.Module):
         # size: (batch_size, embed_dim, 28, 28)
 
         x = self.to_gray(x)  # Convert to grayscale size: (batch_size, 1, 28, 28)
+
+        x = self.tanh(x)  # Normalize to [-1, 1]
+
         return x
 
 
@@ -136,8 +141,8 @@ def main():
     model_base = '../checkpoints/TransGAN/MNIST'
 
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=256, ff_dim=64, dropout=0.1)
-    netD = Discriminator(embed_dim=256, ff_dim=64, dropout=0.1)
+    netG = Generator(noise_dim=100, embed_dim=512, ff_dim=1024, dropout=0.1)
+    netD = Discriminator(embed_dim=64, ff_dim=16, dropout=0.5)
 
     netG = netG.to(device)
     netD = netD.to(device)
@@ -148,7 +153,7 @@ def main():
     beta1 = 0
     beta2 = 0.99
 
-    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, beta2))
+    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr * 0.1, betas=(beta1, beta2))
     optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, beta2))
 
     dataloader_length = len(dataloader)
@@ -157,10 +162,12 @@ def main():
     dis_loss = []
     batch_count = []
 
-    real_label = 1
-    fake_label = 0
+    netG.train()
+    netD.train()
 
     criterion = nn.BCEWithLogitsLoss()
+    real_label = 1
+    fake_label = 0
 
     # Training Loop
     for epoch in range(1, num_epochs + 1):
@@ -171,14 +178,14 @@ def main():
             # Train Discriminator
             netD.zero_grad()
             real_output = netD(real_data).view(-1)
-            errD_real = torch.mean(torch.relu(1.0 - real_output))
+            errD_real = torch.mean(torch.relu(1.0 - real_output)).to(device)
 
             errD_real.backward()
 
             noise = torch.randn(batch_size, 100, 1, 1, device=device)
             fake = netG(noise)
             fake_output = netD(fake.detach()).view(-1)
-            errD_fake = torch.mean(torch.relu(1.0 + fake_output))
+            errD_fake = torch.mean(torch.relu(1.0 + fake_output)).to(device)
 
             errD_fake.backward()
             errD = errD_real + errD_fake
@@ -187,10 +194,37 @@ def main():
             # Train Generator
             netG.zero_grad()
             output = netD(fake).view(-1)
-            errG = -torch.mean(output)
+            errG = -torch.mean(output).to(device)
 
             errG.backward()
             optimizerG.step()
+
+            # real_data = images.to(device)
+            # batch_size = real_data.size(0)
+
+            # # Train Discriminator
+            # netD.zero_grad()
+            # real_output = netD(real_data).view(-1)
+            # errD_real = criterion(real_output, torch.full_like(real_output, real_label))
+
+            # errD_real.backward()
+
+            # noise = torch.randn(batch_size, 100, 1, 1, device=device)
+            # fake = netG(noise)
+            # fake_output = netD(fake.detach()).view(-1)
+            # errD_fake = criterion(fake_output, torch.full_like(fake_output, fake_label))
+
+            # errD_fake.backward()
+            # errD = errD_real + errD_fake
+            # optimizerD.step()
+
+            # # Train Generator
+            # netG.zero_grad()
+            # output = netD(fake).view(-1)
+            # errG = criterion(output, torch.full_like(output, real_label))
+
+            # errG.backward()
+            # optimizerG.step()
 
             # Save Losses for plotting later
 
@@ -232,8 +266,8 @@ def main():
     torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-TransGAN-MNIST.pth'))
 
     fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
-    generate_images(netG, base, fixed_noise, label='Final')
-    generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
+    generate_images(netG, base, fixed_noise, label1='MNIST-Final')
+    generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1='TransGAN-MNIST-final')
 
 
 if __name__ == "__main__":
