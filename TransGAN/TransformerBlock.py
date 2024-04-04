@@ -5,10 +5,10 @@ from torch.nn import MultiheadAttention
 from PositionalEncoding import PositionalEncoding
 
 class TransformerBlock(nn.Module):
-    def __init__(self, embed_dim, ff_dim, dropout=0.1):
+    def __init__(self, embed_dim, ff_dim, num_heads, dropout=0.1):
         super(TransformerBlock, self).__init__()
 
-        self.mhsa = nn.MultiheadAttention(embed_dim, num_heads=8, dropout=dropout, batch_first=True)
+        self.mhsa = nn.MultiheadAttention(embed_dim, num_heads=num_heads, dropout=dropout, batch_first=True)
 
         # Feed Forward Network
         self.ffn = nn.Sequential(
@@ -42,6 +42,9 @@ class TransformerBlock(nn.Module):
 
         return x  # (batch_size, seq_len, embed_dim)
 
+
+
+# NOT USED ANYMORE Just using nn.MultiheadAttention
 class SelfAttention(nn.Module):
     def __init__(self, embed_dim, num_heads, dropout=0.1):
         super(SelfAttention, self).__init__()

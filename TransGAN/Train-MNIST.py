@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import os
 
 class Generator(nn.Module):
-    def __init__(self, noise_dim, embed_dim, ff_dim, dropout):
+    def __init__(self, noise_dim, embed_dim, ff_dim, num_heads, dropout):
         super(Generator, self).__init__()
 
         self.embed_dim = embed_dim
@@ -19,19 +19,20 @@ class Generator(nn.Module):
 
         self.mlp = nn.Sequential(
             nn.Linear(noise_dim, 7 * 7 * embed_dim),
+            nn.BatchNorm1d(7 * 7 * embed_dim),
             nn.ReLU(True)
         )
 
         self.pos_emb = nn.Parameter(torch.randn(1, 7 * 7, embed_dim))
-        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, dropout) for _ in range(3)])
+        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, num_heads, dropout) for _ in range(3)])
         self.upsample1 = nn.Upsample(scale_factor=2, mode='bicubic')  # First upsampling from 7x7 to 14x14
 
         self.pos_emb2 = nn.Parameter(torch.randn(1, 14 * 14, embed_dim))
-        self.blocks2 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, dropout) for _ in range(3)])
+        self.blocks2 = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, num_heads, dropout) for _ in range(3)])
         self.upsample2 = nn.PixelShuffle(2)  # Second upsampling from 14x14 to 28x28
 
         self.pos_emb3 = nn.Parameter(torch.randn(1, 28 * 28, embed_dim // 4))
-        self.blocks3 = nn.Sequential(*[TransformerBlock(embed_dim // 4, ff_dim, dropout) for _ in range(3)])
+        self.blocks3 = nn.Sequential(*[TransformerBlock(embed_dim // 4, ff_dim, num_heads, dropout) for _ in range(3)])
 
         self.to_gray = nn.Conv2d(embed_dim // 4, 1, kernel_size=1)
 
@@ -73,7 +74,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, embed_dim, ff_dim, dropout):
+    def __init__(self, embed_dim, ff_dim, num_heads, dropout):
         super(Discriminator, self).__init__()
 
         self.embed_dim = embed_dim
@@ -82,7 +83,7 @@ class Discriminator(nn.Module):
         
         self.pos_emb = nn.Parameter(torch.randn(1, (28 // 4) ** 2 + 1, embed_dim))
 
-        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, dropout) for _ in range(4)])
+        self.blocks = nn.Sequential(*[TransformerBlock(embed_dim, ff_dim, num_heads, dropout) for _ in range(4)])
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
 
@@ -141,8 +142,8 @@ def main():
     model_base = '../checkpoints/TransGAN/MNIST'
 
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=512, ff_dim=1024, dropout=0.1)
-    netD = Discriminator(embed_dim=64, ff_dim=16, dropout=0.5)
+    netG = Generator(noise_dim=100, embed_dim=512, ff_dim=1024, num_heads=8, dropout=0.1)
+    netD = Discriminator(embed_dim=16, ff_dim=4, num_heads=8, dropout=0.2)
 
     netG = netG.to(device)
     netD = netD.to(device)
@@ -153,7 +154,7 @@ def main():
     beta1 = 0
     beta2 = 0.99
 
-    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr * 0.1, betas=(beta1, beta2))
+    optimizerD = torch.optim.Adam(netD.parameters(), lr=lr, betas=(beta1, beta2))
     optimizerG = torch.optim.Adam(netG.parameters(), lr=lr, betas=(beta1, beta2))
 
     dataloader_length = len(dataloader)
@@ -175,6 +176,18 @@ def main():
             real_data = images.to(device)
             batch_size = real_data.size(0)
 
+            # Add noise to the real images
+            # noise_intensity = 0.1
+            # noise_to_add = torch.randn(real_data.size(), device=device) * noise_intensity
+            # real_data = real_data + noise_to_add
+
+            noise = torch.randn(batch_size, 100, 1, 1, device=device)
+            fake = netG(noise)
+
+            # Add noise to the fake images
+            # noise_to_add = torch.randn(fake.size(), device=device) * noise_intensity
+            # fake = fake + noise_to_add
+
             # Train Discriminator
             netD.zero_grad()
             real_output = netD(real_data).view(-1)
@@ -182,8 +195,6 @@ def main():
 
             errD_real.backward()
 
-            noise = torch.randn(batch_size, 100, 1, 1, device=device)
-            fake = netG(noise)
             fake_output = netD(fake.detach()).view(-1)
             errD_fake = torch.mean(torch.relu(1.0 + fake_output)).to(device)
 
