@@ -53,8 +53,8 @@ def main():
         axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Directly use numpy and transpose here
         axes[i].axis('off')  # Turn off axes for cleaner look
 
-    base = '../produced_images/SAGAN'
-    model_base = '../checkpoints/SAGAN'
+    base = '../produced_images/SAGAN-2'
+    model_base = '../checkpoints/SAGAN-2'
 
     plt.savefig(os.path.join(base, 'celeba_sample_128.png'))
     plt.close(fig)
@@ -130,13 +130,13 @@ def main():
                 fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
                 generate_images(netG, base, fixed_noise, label=f'Epoch-{epoch}')
                 generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
-                torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN.pth'))
-                torch.save(netD.state_dict(), os.path.join(model_base, 'Dis-6Layer-128x128-SAGAN.pth'))
+                torch.save(netG.state_dict(), os.path.join(model_base, f'Gen-8Layer-128x128-SAGAN-2-{epoch}.pth'))
+                torch.save(netD.state_dict(), os.path.join(model_base, f'Dis-8Layer-128x128-SAGAN-2-{epoch}.pth'))
 
     print("Training is complete!")
 
     # Save the trained model
-    torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-SAGAN.pth'))
+    torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-8Layer-128x128-SAGAN-2.pth'))
 
     fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
     generate_images(netG, base, fixed_noise, label='Final')
@@ -170,7 +170,12 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            utils.spectral_norm(nn.ConvTranspose2d(100, 1024, 4, 1, 0, bias=False)),
+            utils.spectral_norm(nn.ConvTranspose2d(100, 2048, 4, 1, 0, bias=False)),
+            nn.BatchNorm2d(2048),
+            nn.ReLU(True),
+            # state size. 2048 x 4 x 4
+
+            utils.spectral_norm(nn.ConvTranspose2d(2048, 1024, 4, 1, 0, bias=False)),
             nn.BatchNorm2d(1024),
             nn.ReLU(True),
             # state size. 1024 x 4 x 4
@@ -201,8 +206,6 @@ class Generator(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(True),
             # state size. 64 x 64 x 64
-
-            # SelfAttention(64), # Self-Attention Layer
 
             utils.spectral_norm(nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False)),  # Output 3 channels for RGB
             nn.Tanh()
