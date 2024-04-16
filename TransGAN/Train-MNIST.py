@@ -1,7 +1,5 @@
 import torch.nn as nn
 from TransformerBlock import TransformerBlock
-from PositionalEncoding import PositionalEncoding
-from Generator import UpsamplingBlock, UpsampleBlock_PixelShuffle
 import torch
 from torchvision.datasets import MNIST
 from torchvision import transforms
@@ -91,7 +89,7 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         x = self.from_gray(x)  # Convert to grayscale size: (batch_size, embed_dim, 28, 28)
-        x = x.view(x.shape[0], (28 // 4) ** 2, self.embed_dim) # size: (batch_size, 28 * 28, embed_dim)
+        x = x.view(x.shape[0], (28 // 4) ** 2, self.embed_dim) # size: (batch_size, 7 * 7, embed_dim)
 
         # Concat CLS Token
         cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
@@ -142,8 +140,8 @@ def main():
     model_base = '../checkpoints/TransGAN/MNIST'
 
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=512, ff_dim=1024, num_heads=8, dropout=0.1)
-    netD = Discriminator(embed_dim=16, ff_dim=4, num_heads=8, dropout=0.2)
+    netG = Generator(noise_dim=100, embed_dim=256, ff_dim=512, num_heads=8, dropout=0.1)
+    netD = Discriminator(embed_dim=256, ff_dim=512, num_heads=8, dropout=0.2)
 
     netG = netG.to(device)
     netD = netD.to(device)
