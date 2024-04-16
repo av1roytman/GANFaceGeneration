@@ -140,7 +140,7 @@ def main():
     model_base = '../checkpoints/TransGAN/MNIST'
 
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=256, ff_dim=512, num_heads=8, dropout=0.1)
+    netG = Generator(noise_dim=100, embed_dim=1024, ff_dim=2048, num_heads=8, dropout=0.1)
     netD = Discriminator(embed_dim=256, ff_dim=512, num_heads=8, dropout=0.2)
 
     netG = netG.to(device)
