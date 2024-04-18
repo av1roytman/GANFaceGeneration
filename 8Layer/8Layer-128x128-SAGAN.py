@@ -14,10 +14,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Distributed Data Parallel
-    dist.init_process_group('nccl')
-    device = torch.device(f'cuda:{torch.distributed.get_rank()}')
+    dataloader = DataLoader(dataset, batch_size=global_batch_size, shuffle=True, num_workers=8)
 
     # Reshape data and scale to [-1, 1]
     transform = transforms.Compose([
@@ -97,14 +94,14 @@ def main():
             # Train Discriminator
             netD.zero_grad()
             output = netD(real_data).view(-1)
-            errD_real = torch.mean(torch.relu(1.0 - output))
+            errD_real = torch.mean(torch.nn.functional.relu(1.0 - output))
             errD_real.backward()
             
             noise = torch.randn(batch_size, 100, 1, 1, device=device)
             fake = netG(noise)
             label.fill_(0)
             output = netD(fake.detach()).view(-1)
-            errD_fake = torch.mean(torch.relu(1.0 + output))
+            errD_fake = torch.mean(torch.nn.functional.relu(1.0 + output))
             errD_fake.backward()
             errD = errD_real + errD_fake
             optimizerD.step()
@@ -212,9 +209,17 @@ class Generator(nn.Module):
             nn.Tanh()
             # state size. 3 x 128 x 128
         )
-
+        self.self_attn = nn.ModuleList([
+            SelfAttention(128),  # Self-Attention Layer for state size 128 x 32 x 32
+            SelfAttention(64)    # Self-Attention Layer for state size 64 x 64 x 64
+        ])
     def forward(self, input):
-        return self.main(input)
+        x = self.main[0:9](input)
+        x = self.self_attn[0](x)
+        x = self.main[9:15](x)
+        x = self.self_attn[1](x)
+        x = self.main[15:](x)
+        return x
 
 class Discriminator(nn.Module):
     def __init__(self):
@@ -266,8 +271,15 @@ class Discriminator(nn.Module):
             # state size. 1
         )
 
+        self.self_attn = nn.ModuleList([
+            SelfAttention(512)  # Self-Attention Layer for state size 512 x 8 x 8
+        ])
+
     def forward(self, input):
-        return self.main(input).view(-1, 1).squeeze(1)
+        x = self.main[0:18](input)
+        x = self.self_attn[0](x)
+        x = self.main[18:](x)
+        return x.view(-1, 1).squeeze(1)
 
 class SelfAttention(nn.Module):
     def __init__(self, in_dim):
