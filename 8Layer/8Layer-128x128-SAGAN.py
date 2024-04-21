@@ -83,51 +83,55 @@ def main():
 
     # Training Loop
     for epoch in range(1, num_epochs + 1):
-        for i, data in enumerate(dataloader, 0):
-            sampler.set_epoch(epoch)
-
-            # Transfer data tensor to GPU/CPU (device)
+        for i, data in enumerate(dataloader):
             real_data = data.to(device)
             batch_size = real_data.size(0)
-            label = torch.full((batch_size,), 1, dtype=torch.float, device=device)
+            real_label = torch.ones(batch_size, device=device)
+            fake_label = torch.zeros(batch_size, device=device)
 
             # Train Discriminator
             netD.zero_grad()
-            output = netD(real_data).view(-1)
-            errD_real = torch.mean(torch.nn.functional.relu(1.0 - output))
-            errD_real.backward()
             
+            # Real data
+            output_real = netD(real_data).view(-1)
+            errD_real = nn.BCEWithLogitsLoss()(output_real, real_label)
+            errD_real.backward()
+            D_x = output_real.mean().item()
+
+            # Fake data
             noise = torch.randn(batch_size, 100, 1, 1, device=device)
-            fake = netG(noise)
-            label.fill_(0)
-            output = netD(fake.detach()).view(-1)
-            errD_fake = torch.mean(torch.nn.functional.relu(1.0 + output))
+            fake_data = netG(noise)
+            output_fake = netD(fake_data.detach()).view(-1)
+            errD_fake = nn.BCEWithLogitsLoss()(output_fake, fake_label)
             errD_fake.backward()
+            D_G_z1 = output_fake.mean().item()
+
+            # Total discriminator loss
             errD = errD_real + errD_fake
             optimizerD.step()
 
             # Train Generator
             netG.zero_grad()
-            label.fill_(1)  # The generator wants the discriminator to think the fake images are real
-            output = netD(fake).view(-1)
-            errG = -torch.mean(output)
+            output = netD(fake_data).view(-1)
+            errG = nn.BCEWithLogitsLoss()(output, real_label)
             errG.backward()
+            D_G_z2 = output.mean().item()
             optimizerG.step()
 
-            # Save Losses for plotting later
-
-            if i % 50 == 0 and torch.distributed.get_rank() == 0:
+            # Save losses and display progress
+            if i % 50 == 0:
                 gen_loss.append(errG.item())
                 dis_loss.append(errD.item())
-                batch_count.append(i + dataloader_length * epoch)
-                print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
+                batch_count.append(i + len(dataloader) * (epoch - 1))
+                print(f'[{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f} D(x): {D_x:.4f} D(G(z)): {D_G_z1:.4f} / {D_G_z2:.4f}')
 
-            if epoch % 25 == 0 and i == 0 and torch.distributed.get_rank() == 0:
-                fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
-                generate_images(netG, base, fixed_noise, label=f'Epoch-{epoch}')
-                generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
-                torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-8Layer-128x128-SAGAN.pth'))
-                torch.save(netD.state_dict(), os.path.join(model_base, 'Dis-8Layer-128x128-SAGAN.pth'))
+        # Save model checkpoints and generate images periodically
+        if epoch % 25 == 0:
+            fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
+            generate_images(netG, base, fixed_noise, label=f'Epoch-{epoch}')
+            generate_loss_graphs(gen_loss, dis_loss, batch_count, base)
+            torch.save(netG.state_dict(), os.path.join(model_base, f'Gen-8Layer-128x128-SAGAN_Epoch{epoch}.pth'))
+            torch.save(netD.state_dict(), os.path.join(model_base, f'Dis-8Layer-128x128-SAGAN_Epoch{epoch}.pth'))
 
     print("Training is complete!")
 
