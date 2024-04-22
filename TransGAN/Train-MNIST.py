@@ -4,9 +4,9 @@ import torch
 from torchvision.datasets import MNIST
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from Helpers import generate_images, generate_loss_graphs
 import matplotlib.pyplot as plt
 import os
+import numpy as np
 
 class Generator(nn.Module):
     def __init__(self, noise_dim, embed_dim, ff_dim, num_heads, dropout):
@@ -120,7 +120,7 @@ class PatchEmbedding(nn.Module):
     
 
 def main():
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
     # Reshape data and scale to [-1, 1]
     transform = transforms.Compose([
@@ -139,15 +139,17 @@ def main():
     base = '../produced_images/TransGAN/MNIST'
     model_base = '../checkpoints/TransGAN/MNIST'
 
+    version = '2'
+
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=64, ff_dim=128, num_heads=8, dropout=0.1)
-    netD = Discriminator(embed_dim=64, ff_dim=128, num_heads=8, dropout=0.2)
+    netG = Generator(noise_dim=100, embed_dim=128, ff_dim=128, num_heads=8, dropout=0.1)
+    netD = Discriminator(embed_dim=128, ff_dim=128, num_heads=8, dropout=0.2)
 
     netG = netG.to(device)
     netD = netD.to(device)
 
     # Hyperparameters
-    num_epochs = 10
+    num_epochs = 100
     lr = 0.001
     beta1 = 0
     beta2 = 0.99
@@ -163,10 +165,6 @@ def main():
 
     netG.train()
     netD.train()
-
-    criterion = nn.BCEWithLogitsLoss()
-    real_label = 1
-    fake_label = 0
 
     # Training Loop
     for epoch in range(1, num_epochs + 1):
@@ -205,43 +203,79 @@ def main():
                 gen_loss.append(errG.item())
                 dis_loss.append(errD.item())
                 batch_count.append(i + dataloader_length * epoch)
-                print(f'[{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
+                print(f'[{version}][{epoch}/{num_epochs}][{i}/{dataloader_length}] Loss_D: {errD.item():.4f} Loss_G: {errG.item():.4f}')
 
-                # Print images and their labels from the discriminator
-                real_data = real_data.cpu().numpy().transpose((0, 2, 3, 1))
-                fake = fake.detach().cpu().numpy().transpose((0, 2, 3, 1))
+                # # Print images and their labels from the discriminator
+                # real_data = real_data.cpu().numpy().transpose((0, 2, 3, 1))
+                # fake = fake.detach().cpu().numpy().transpose((0, 2, 3, 1))
 
-                fig, axs = plt.subplots(2, batch_size, figsize=(batch_size * 2, 4))
+                # fig, axs = plt.subplots(2, batch_size, figsize=(batch_size * 2, 4))
 
-                for j in range(batch_size):
-                    axs[0, j].imshow((real_data[j] * 0.5) + 0.5, cmap='gray')
-                    axs[0, j].set_title(f'Real: {real_output[j].item():.2f}')
-                    axs[0, j].axis('off')
+                # for j in range(batch_size):
+                #     axs[0, j].imshow((real_data[j] * 0.5) + 0.5, cmap='gray')
+                #     axs[0, j].set_title(f'Real: {real_output[j].item():.2f}')
+                #     axs[0, j].axis('off')
 
-                    axs[1, j].imshow((fake[j] * 0.5) + 0.5, cmap='gray')
-                    axs[1, j].set_title(f'Fake: {fake_output[j].item():.2f}')
-                    axs[1, j].axis('off')
+                #     axs[1, j].imshow((fake[j] * 0.5) + 0.5, cmap='gray')
+                #     axs[1, j].set_title(f'Fake: {fake_output[j].item():.2f}')
+                #     axs[1, j].axis('off')
 
-                # print("I'm here")
-                plt.savefig(os.path.join(base, f'Samples/epoch_{epoch}_batch_{i}.png'))
-                plt.close(fig)
+                # # print("I'm here")
+                # plt.savefig(os.path.join(base, f'Samples/epoch_{epoch}_batch_{i}.png'))
+                # plt.close(fig)
 
-            if epoch % 10 == 0 and i == 0:
-                fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
-                generate_images(netG, base, fixed_noise, label1='TransGAN-MNIST', label2=f'Epoch-{epoch}')
-                torch.save(netG.state_dict(), os.path.join(model_base, f'Gen-6Layer-128x128-TransGAN-MNIST-{epoch}.pth'))
-                torch.save(netD.state_dict(), os.path.join(model_base, f'Dis-6Layer-128x128-TransGAN-MNIST-{epoch}.pth'))
+        if epoch % 5 == 0:
+            fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
+            generate_images(netG, base, fixed_noise, label1=f'{version}', label2=f'Epoch-{epoch}')
+            torch.save(netG.state_dict(), os.path.join(model_base, f'Gen-TransGAN-MNIST-{version}-{epoch}.pth'))
+            torch.save(netD.state_dict(), os.path.join(model_base, f'Dis-TransGAN-MNIST-{epoch}.pth'))
 
     print("Training is complete!")
 
     # Save the trained model
 
-    torch.save(netG.state_dict(), os.path.join(model_base, 'Gen-6Layer-128x128-TransGAN-MNIST.pth'))
+    torch.save(netG.state_dict(), os.path.join(model_base, f'Gen-TransGAN-MNIST-{version}.pth'))
 
     fixed_noise = torch.randn(global_batch_size, 100, 1, 1, device=device)
-    generate_images(netG, base, fixed_noise, label1='MNIST-Final')
-    generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1='TransGAN-MNIST-final')
+    generate_images(netG, base, fixed_noise, label1=f'MNIST-{version}-Final')
+    generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1=f'TransGAN-MNIST-{version}-final')
 
+
+def generate_images(netG, base, fixed_noise, label1="", label2=""):
+    # After training, use the generator to produce images from the fixed noise vectors
+    netG.eval()
+    with torch.no_grad():
+        fake_images = netG(fixed_noise).detach().cpu()
+
+    fig, axes = plt.subplots(3, 3, figsize=(9, 9))
+
+    # Flatten the 2D array of axes for easy iteration
+    axes = axes.flatten()
+
+    for i in range(9):
+        image = fake_images[i]
+        image = (image + 1) / 2.0 # Scale images to [0, 1] to visualize better
+        image = image.squeeze()
+        axes[i].imshow(image.numpy(), cmap='gray')  # Directly use numpy and transpose here
+        axes[i].axis('off')  # Turn off axes for cleaner look
+
+    plt.savefig(os.path.join(base, f'TransGAN-MNIST-{label1}-{label2}.png'))
+    plt.close(fig)
+
+    # return netG to training mode
+    netG.train()
+
+def generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1=""):
+    # Graph the Loss
+    plt.figure(figsize=(10, 5))
+    plt.title("Generator and Discriminator Loss During Training")
+    plt.plot(batch_count, gen_loss, label="Generator")
+    plt.plot(batch_count, dis_loss, label="Discriminator")
+    plt.xlabel("Batch Count")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.savefig(os.path.join(base, f'Loss_6Layer-128x128-{label1}.png'))
+    plt.close()
 
 if __name__ == "__main__":
     main()
