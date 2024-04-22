@@ -140,8 +140,8 @@ def main():
     model_base = '../checkpoints/TransGAN/MNIST'
 
     # Model Initialization
-    netG = Generator(noise_dim=100, embed_dim=1024, ff_dim=2048, num_heads=8, dropout=0.1)
-    netD = Discriminator(embed_dim=256, ff_dim=512, num_heads=8, dropout=0.2)
+    netG = Generator(noise_dim=100, embed_dim=64, ff_dim=128, num_heads=8, dropout=0.1)
+    netD = Discriminator(embed_dim=64, ff_dim=128, num_heads=8, dropout=0.2)
 
     netG = netG.to(device)
     netD = netD.to(device)
@@ -174,17 +174,8 @@ def main():
             real_data = images.to(device)
             batch_size = real_data.size(0)
 
-            # Add noise to the real images
-            # noise_intensity = 0.1
-            # noise_to_add = torch.randn(real_data.size(), device=device) * noise_intensity
-            # real_data = real_data + noise_to_add
-
             noise = torch.randn(batch_size, 100, 1, 1, device=device)
             fake = netG(noise)
-
-            # Add noise to the fake images
-            # noise_to_add = torch.randn(fake.size(), device=device) * noise_intensity
-            # fake = fake + noise_to_add
 
             # Train Discriminator
             netD.zero_grad()
@@ -207,33 +198,6 @@ def main():
 
             errG.backward()
             optimizerG.step()
-
-            # real_data = images.to(device)
-            # batch_size = real_data.size(0)
-
-            # # Train Discriminator
-            # netD.zero_grad()
-            # real_output = netD(real_data).view(-1)
-            # errD_real = criterion(real_output, torch.full_like(real_output, real_label))
-
-            # errD_real.backward()
-
-            # noise = torch.randn(batch_size, 100, 1, 1, device=device)
-            # fake = netG(noise)
-            # fake_output = netD(fake.detach()).view(-1)
-            # errD_fake = criterion(fake_output, torch.full_like(fake_output, fake_label))
-
-            # errD_fake.backward()
-            # errD = errD_real + errD_fake
-            # optimizerD.step()
-
-            # # Train Generator
-            # netG.zero_grad()
-            # output = netD(fake).view(-1)
-            # errG = criterion(output, torch.full_like(output, real_label))
-
-            # errG.backward()
-            # optimizerG.step()
 
             # Save Losses for plotting later
 
