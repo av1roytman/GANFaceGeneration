@@ -49,7 +49,6 @@ TransGAN
 * Helpers.py
 * PositionalEncoding.py
 
-Avi likes BBC
 * Train.py
 * TransformerBlock.py
 
