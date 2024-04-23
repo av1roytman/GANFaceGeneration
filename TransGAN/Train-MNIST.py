@@ -274,7 +274,7 @@ def generate_loss_graphs(gen_loss, dis_loss, batch_count, base, label1=""):
     plt.xlabel("Batch Count")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig(os.path.join(base, f'Loss_6Layer-128x128-{label1}.png'))
+    plt.savefig(os.path.join(base, f'{label1}.png'))
     plt.close()
 
 if __name__ == "__main__":
